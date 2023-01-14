@@ -3,13 +3,15 @@ Parameters common to all scripts.
 
 Perhaps put column lists here? At the moment, no. I think we want a different
 n_round for time and accuracy.
+
+Use mubar not mu. 
 """
 
 import numpy as np
 import matplotlib as mpl
 
 rho, r, gamma, nu = 0.05, 0.02, 2.0, 0.2
-mu, sigma = -np.log(0.95), np.sqrt(-2*np.log(0.95))*nu
+mubar, sigma = -np.log(0.95), np.sqrt(-2*np.log(0.95))*nu
 maxiter, maxiter_PFI, tol = 20000, 25, 10**-8
 
 max_age = 60

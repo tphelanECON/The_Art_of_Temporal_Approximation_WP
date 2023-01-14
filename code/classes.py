@@ -1,67 +1,62 @@
 """
 class constructors for the paper "The Art of Temporal Approximation" by Keyvan
-Eslami and Thomas Phelan. The Python code was written by Thomas so please direct
-questions to him.
+Eslami and Thomas Phelan.
 
 This script contains three class constructors:
 
     1. DT_IFP: discrete-time IFP (stationary and age-dependent)
     2. CT_stat_IFP: continuous-time stationary IFP
-    3. CT_nonstat_IFP: continuous-time age-dependent IFP
+    3. CT_nonstat_IFP: continuous-time nonstationary (age-dependent) IFP
 
 Some miscellaneous notes:
 
     * All "solve" methods return a quadruple V, c, time, i.
+    * Dt is constant in every class constructor. Theory permits state-dependence
+    but the paper does not exploit this.
     * In discrete-time setting max_age is inferred from dt (which equals dA)
-    instead of being a parameter of the class.
-    * In the implementation of EGM, we replace V_prime with a small positive number
-    if it is negative. But this is never chosen.
-    * No need for fill_value="extrapolate" in interp1d. If Python wants to extrapolate
-    then something else has gone wrong.
-
-January 6 notes.
-
-No convergence with brute force if upper bound for consumption grid is c_upper.
-cgrid_rest = np.linspace(max(clow,10**-6), self.c_upper, self.N_c)
-But if the upper bound is the minimum of this as chigh, then we are fine. The
-problem therefore seems to be in what happens if we choose things off the grid.
-
-In the discrete-time setting, age is INFERRED from other quantities.
-
-
+    * In continuous-time setting max age is a primitive, as bnd enters explicitly.
+    * In implementation of EGM in DT_IFP, we replace V_prime with small positive
+    number if negative. This never appears to be chosen in the optimal policy.
+    * No need for fill_value="extrapolate" in interp1d in DT_IFP. If Python wants
+    to extrapolate then something else has gone wrong, because consumption should
+    be restricted so that future assets lie on exogenous grid.
+    * To address potential overflow problems when using sparse solver, we divide
+    both sides of the linear system by Dt.
+    * In the discrete-time setting, age is INFERRED from other quantities.
 """
 
 import numpy as np
 import scipy.sparse as sp
 from scipy.sparse import linalg
 from scipy.sparse import diags
-import time
 from scipy.interpolate import interp1d
+import time
 
 class DT_IFP(object):
-    def __init__(self, rho=0.05, r=0.02, gamma=2, ybar=1, mu=-np.log(0.95),
-    sigma=np.sqrt(-2*np.log(0.95))*0.2, bnd=[[0,100],[-0.5,0.5]], N=[80,20],
+    def __init__(self, rho=0.05, r=0.02, gamma=2, ybar=1, mubar=-np.log(0.95),
+    sigma=np.sqrt(-2*np.log(0.95))*0.2, bnd=[[0,60],[-0.8,0.8]], N=[100,10],
     NA=60, N_c=2000, dt=0.01, tol=10**-6, maxiter=20, maxiter_PFI=25,
     show_method=1, show_iter=1, show_final=1):
         self.rho, self.r, self.gamma = rho, r, gamma
-        self.ybar, self.mu, self.sigma = ybar, mu, sigma
+        self.ybar, self.mubar, self.sigma = ybar, mubar, sigma
         self.N, self.bnd, self.NA = N, bnd, NA
         self.tol, self.maxiter, self.maxiter_PFI = tol, maxiter, maxiter_PFI
         self.bnd, self.Delta = bnd, [(bnd[i][1]-bnd[i][0])/self.N[i] for i in range(2)]
         self.grid = [np.linspace(self.bnd[i][0]+self.Delta[i],self.bnd[i][1]-self.Delta[i],self.N[i]-1) for i in range(2)]
         self.xx = np.meshgrid(self.grid[0],self.grid[1],indexing='ij')
-        self.ii, self.jj = np.meshgrid(range(self.N[0] - 1),range(self.N[1] - 1), indexing='ij')
+        self.ii, self.jj = np.meshgrid(range(self.N[0]-1),range(self.N[1]-1),indexing='ij')
         self.sigsig = self.sigma*(self.jj > 0)*(self.jj < self.N[1] - 2)
         self.dt = dt
         self.Dt = self.dt + 0*self.xx[0]
         self.grid_A = np.linspace(0+self.dt,self.dt*(self.NA-1),self.NA-1)
         self.N_c, self.M = N_c, (self.N[0]-1)*(self.N[1]-1)
+        #following is "zero net saving" and value of this policy
         self.c0 = self.r*self.xx[0]/(1+self.dt*self.r) + self.ybar*np.exp(self.xx[1])
-        self.pup = self.dt*(self.sigsig**2/2 + self.Delta[1]*np.maximum(self.mu*(-self.grid[1]),0))/self.Delta[1]**2
-        self.pdown = self.dt*(self.sigsig**2/2 + self.Delta[1]*np.maximum(self.mu*(self.grid[1]),0))/self.Delta[1]**2
+        self.V0 = self.V(self.c0)
+        self.pup = self.dt*(self.sigsig**2/2 + self.Delta[1]*np.maximum(self.mubar*(-self.grid[1]),0))/self.Delta[1]**2
+        self.pdown = self.dt*(self.sigsig**2/2 + self.Delta[1]*np.maximum(self.mubar*(self.grid[1]),0))/self.Delta[1]**2
         self.pstay = 1 - self.pup - self.pdown
         self.prob_check = np.min(self.pstay)
-        self.V0 = self.V(self.c0)
         self.c_upper = 2*np.max(self.c0)
         self.show_method, self.show_iter, self.show_final = show_method, show_iter, show_final
 
@@ -80,26 +75,24 @@ class DT_IFP(object):
         x = (self.xx[0][ii,jj],self.xx[1][ii,jj])
         sig = self.sigsig[ii,jj]
         d = [self.dt/self.Delta[i]**2 for i in range(2)]
-        p_func[1] = d[1]*(sig**2/2 + self.Delta[1]*np.maximum(self.mu*(-x[1]),0))
-        p_func[-1] = d[1]*(sig**2/2 + self.Delta[1]*np.maximum(-self.mu*(-x[1]),0))
+        #probability of up transition, down transition and no transition, resp:
+        p_func[1] = d[1]*(sig**2/2 + self.Delta[1]*np.maximum(self.mubar*(-x[1]),0))
+        p_func[-1] = d[1]*(sig**2/2 + self.Delta[1]*np.maximum(-self.mubar*(-x[1]),0))
         p_func[0] = 1 - p_func[-1] - p_func[1]
         return p_func
 
     def P(self,c):
         P = sp.coo_matrix((self.M,self.M))
         b_prime = (1 + self.dt*self.r)*(self.xx[0] + self.dt*(self.ybar*np.exp(self.xx[1]) - c))
-        b_prime = np.minimum(np.maximum(b_prime,self.bnd[0][0]), self.bnd[0][1]-10**(-4))
         alpha, ind = self.weights_indices(b_prime)
         ii, jj = self.ii, self.jj
+        #two KINDS of transitions: to asset point above and below "true" choice
         for key in [-1,0,1]:
             #lower weight on asset transition
             row, col = ii*(self.N[1]-1) + jj, ind[ii,jj]*(self.N[1]-1) + jj + key
-            val = alpha[ii,jj]*self.p_func((ii,jj))[key]
-            P = P + self.P_func(row,col,val)
+            P = P + self.P_func(row,col,alpha[ii,jj]*self.p_func((ii,jj))[key])
             #upper weight on asset transition
-            row, col = ii*(self.N[1]-1) + jj, (ind[ii,jj]+1)*(self.N[1]-1) + jj + key
-            val = (1-alpha[ii,jj])*self.p_func((ii,jj))[key]
-            P = P + self.P_func(row,col,val)
+            P = P + self.P_func(row,col+(self.N[1]-1),(1-alpha[ii,jj])*self.p_func((ii,jj))[key])
         return P
 
     def polupdate_BF(self,V,stat=1):
@@ -109,7 +102,7 @@ class DT_IFP(object):
             for j in range(self.N[1]-1):
                 clow = (self.grid[0][i] - self.grid[0][-1]/(1+self.dt*self.r))/self.dt + self.ybar*np.exp(self.grid[1][j]) + 10**-4
                 chigh = (self.grid[0][i] - self.grid[0][0]/(1+self.dt*self.r))/self.dt + self.ybar*np.exp(self.grid[1][j]) - 10**-4
-                #problems occur if we extrapolate off grid.
+                #there should be NO extrapoltion in the following.
                 if stat==1:
                     cgrid_rest = np.linspace(max(clow,10**-8), min(chigh, self.c_upper), self.N_c)
                 else:
@@ -172,18 +165,10 @@ class DT_IFP(object):
         chigh = (self.grid[0][ii] - self.grid[0][0]/(1+self.dt*self.r))/self.dt + self.ybar*np.exp(self.grid[1][jj]) - 10**-4
         return np.minimum(np.maximum(c, clow), chigh)
 
-    def round_grid(self,b_prime):
-        b_prime = np.minimum(np.maximum(b_prime,self.bnd[0][0]), self.bnd[0][1])
-        x = np.subtract.outer(b_prime, self.grid[0])
-        x[x < 0] = 10**4
-        y = np.argmin(x, axis=x.ndim-1) #minimize over b in X.grid[0]. find smallest positive number
-        return self.grid[0][y], y
-
     def weights_indices(self,b_prime):
-        lower, ind = self.round_grid(b_prime)
-        upper = lower + self.Delta[0]
-        alpha = 1 - (b_prime - lower)/(upper - lower)
-        return alpha, ind
+        ind = np.array([np.floor(b/self.Delta[0])-1 for b in b_prime]).astype(int)
+        lower = np.array([self.grid[0][0]+i*self.Delta[0] for i in ind])
+        return 1 - (b_prime - lower)/self.Delta[0], ind
 
     def V(self,c):
         B = np.exp(-self.rho*self.dt)*self.P(c) - sp.eye(self.M)
@@ -222,7 +207,6 @@ class DT_IFP(object):
             print("Time taken:", toc-tic)
         return V, c, toc-tic, i
 
-    #i is redundant in the following
     def nonstat_solve(self,method):
         if self.show_method==1:
             if method == 'BF':
@@ -287,24 +271,20 @@ class DT_IFP(object):
 
     def P_func(self,A,B,C):
         A,B,C = np.array(A), np.array(B), np.array(C)
-        indicator = np.isin(A,range(self.M))*np.isin(B,range(self.M))
-        A,B,C = A[indicator],B[indicator],C[indicator]
+        A,B,C = A[(B>-1)*(B<self.M)],B[(B>-1)*(B<self.M)],C[(B>-1)*(B<self.M)]
         return sp.coo_matrix((C.reshape(np.size(C),),(A.reshape(np.size(A),),B.reshape(np.size(B),))),shape=(self.M,self.M))
 
 """
-Continuous-time stationary problem. We only ever use the small dt.
-
-CAREFUL ABOUT OVERFLOW: when using the sparse solver, I divide sides of the
-linear system by Dt, which is always a constant.
+Continuous-time stationary problem
 """
 
 class CT_stat_IFP(object):
-    def __init__(self,rho=0.05, r=0.02, gamma=2., ybar=1, mu=-np.log(0.95),
-    sigma=np.sqrt(-2*np.log(0.95))*0.2, bnd=[[0,50],[-0.6,0.6]], N=(200,10),
+    def __init__(self,rho=0.05, r=0.02, gamma=2., ybar=1, mubar=-np.log(0.95),
+    sigma=np.sqrt(-2*np.log(0.95))*0.2, bnd=[[0,60],[-0.8,0.8]], N=(100,10),
     dt=10**-4, tol=10**-4, maxiter=200, maxiter_PFI=25, show_method=1,
     show_iter=1, show_final=1, kappa = 3):
         self.r, self.rho, self.gamma = r, rho, gamma
-        self.ybar, self.mu, self.sigma = ybar, mu, sigma
+        self.ybar, self.mubar, self.sigma = ybar, mubar, sigma
         self.tol, self.maxiter, self.maxiter_PFI = tol, maxiter, maxiter_PFI
         self.N, self.M = N, (N[0]-1)*(N[1]-1)
         self.bnd, self.Delta = bnd, [(bnd[i][1]-bnd[i][0])/self.N[i] for i in range(2)]
@@ -329,8 +309,8 @@ class CT_stat_IFP(object):
         d = [dt/self.Delta[i]**2 for i in range(2)]
         p_func[(1,0)] = d[0]*self.Delta[0]*np.maximum(self.r*x[0]+self.ybar*np.exp(x[1])-c,0)
         p_func[(-1,0)] = d[0]*self.Delta[0]*np.maximum(-(self.r*x[0]+self.ybar*np.exp(x[1])-c),0)
-        p_func[(0,1)] = d[1]*(sig**2/2 + self.Delta[1]*np.maximum(self.mu*(-x[1]),0))
-        p_func[(0,-1)] = d[1]*(sig**2/2 + self.Delta[1]*np.maximum(-self.mu*(-x[1]),0))
+        p_func[(0,1)] = d[1]*(sig**2/2 + self.Delta[1]*np.maximum(self.mubar*(-x[1]),0))
+        p_func[(0,-1)] = d[1]*(sig**2/2 + self.Delta[1]*np.maximum(-self.mubar*(-x[1]),0))
         return p_func
 
     def prob_test(self,kappa):
@@ -338,7 +318,7 @@ class CT_stat_IFP(object):
         diag = 1 - sum(self.p_func((self.mesh([0,0])),kappa*self.c0).values())
         return np.min(diag) > 0
 
-    def P_tran(self,c):
+    def P(self,c):
         ii, jj = self.mesh([0,0])
         row = ii*(self.N[1]-1) + jj
         diag = 1 - sum(self.p_func((ii,jj),c).values())
@@ -357,7 +337,7 @@ class CT_stat_IFP(object):
     def V(self,c):
         b = c**(1-self.gamma)/(1-self.gamma)
         D = np.exp(-self.rho*self.Dt).reshape((self.M,))
-        B = (sp.eye(self.M) - sp.diags(D)*self.P_tran(c))/self.dt
+        B = (sp.eye(self.M) - sp.diags(D)*self.P(c))/self.dt
         return sp.linalg.spsolve(B, b.reshape((self.M,))).reshape((self.N[0]-1,self.N[1]-1))
 
     def solve_PFI(self):
@@ -385,7 +365,7 @@ class CT_stat_IFP(object):
     def MPFI(self,c,V,M):
         b = (self.Dt*c**(1-self.gamma)/(1-self.gamma)).reshape((self.M,))
         D = np.exp(-self.rho*self.Dt).reshape((self.M,))
-        V, P = V.reshape((self.M,)), sp.diags(D)*self.P_tran(c)
+        V, P = V.reshape((self.M,)), sp.diags(D)*self.P(c)
         for i in range(M+1):
             V = b + P*V
         return V.reshape((self.N[0]-1,self.N[1]-1))
@@ -401,7 +381,7 @@ class CT_stat_IFP(object):
             V, i = V1, i+1
         toc = time.time()
         print("Difference in iterates for MPFI", M, ":", eps, "Iterations:", i)
-        if np.mean(self.P_tran(self.polupdate(V)).sum(axis=1)) < 1:
+        if np.mean(self.P(self.polupdate(V)).sum(axis=1)) < 1:
             print("Problem: mass missing in transition matrix")
         return V, self.polupdate(V), toc-tic, i
 
@@ -436,12 +416,12 @@ Non-stationary continuous-time income fluctuation problem
 """
 
 class CT_nonstat_IFP(object):
-    def __init__(self, rho=0.05, r=0.03, gamma=2., ybar=1, mu=-np.log(0.95),
+    def __init__(self, rho=0.05, r=0.03, gamma=2., ybar=1, mubar=-np.log(0.95),
     sigma=np.sqrt(-2*np.log(0.95))*0.2, bnd=[[0,50],[-0.6,0.6],[0,60]], N=(40,10,10),
     dt = 10**(-4), tol=10**-6, maxiter=200, maxiter_PFI=25, mono_tol=10**(-6),
     show_method=1, show_iter=1, show_final=1):
         self.r, self.rho, self.gamma = r, rho, gamma
-        self.ybar, self.mu, self.sigma = ybar, mu, sigma
+        self.ybar, self.mubar, self.sigma = ybar, mubar, sigma
         self.tol, self.mono_tol = tol, mono_tol
         self.maxiter, self.maxiter_PFI = maxiter, maxiter_PFI
         self.N, self.M, self.M_slice = N, (N[0]-1)*(N[1]-1)*(N[2]-1), (N[0]-1)*(N[1]-1)
@@ -467,12 +447,12 @@ class CT_nonstat_IFP(object):
         d = [dt/self.Delta[i]**2 for i in range(3)]
         p_func[(1,0,0)] = d[0]*self.Delta[0]*np.maximum(self.r*x[0]+self.ybar*np.exp(x[1])-c,0)
         p_func[(-1,0,0)] = d[0]*self.Delta[0]*np.maximum(-(self.r*x[0]+self.ybar*np.exp(x[1])-c),0)
-        p_func[(0,1,0)] = d[1]*(sig**2/2 + self.Delta[1]*np.maximum(self.mu*(-x[1]),0))
-        p_func[(0,-1,0)] = d[1]*(sig**2/2 + self.Delta[1]*np.maximum(-self.mu*(-x[1]),0))
+        p_func[(0,1,0)] = d[1]*(sig**2/2 + self.Delta[1]*np.maximum(self.mubar*(-x[1]),0))
+        p_func[(0,-1,0)] = d[1]*(sig**2/2 + self.Delta[1]*np.maximum(-self.mubar*(-x[1]),0))
         p_func[(0,0,1)] = dt/self.Delta[2]
         return p_func
 
-    def P_tran(self,c):
+    def P(self,c):
         ii, jj, kk = self.mesh([0,0,0])
         row = ii*((self.N[1]-1)*(self.N[2]-1)) + jj*(self.N[2]-1) + kk
         diag = 1 - sum(self.p_func((ii,jj,kk),c).values())
@@ -488,7 +468,7 @@ class CT_nonstat_IFP(object):
     def V(self,c):
         b = c**(1-self.gamma)/(1-self.gamma)
         D = np.exp(-self.rho*self.Dt).reshape((self.M,))
-        B = (sp.eye(self.M) - sp.diags(D)*self.P_tran(c))/self.dt
+        B = (sp.eye(self.M) - sp.diags(D)*self.P(c))/self.dt
         return sp.linalg.spsolve(B, b.reshape((self.M,))).reshape((self.N[0]-1,self.N[1]-1,self.N[2]-1))
 
     def polupdate(self,V):
@@ -541,12 +521,12 @@ class CT_nonstat_IFP(object):
         d = [dt/self.Delta[i]**2 for i in range(2)]
         p_func[(1,0)] = d[0]*self.Delta[0]*np.maximum(self.r*x[0]+np.exp(x[1])-c,0)
         p_func[(-1,0)] = d[0]*self.Delta[0]*np.maximum(-(self.r*x[0]+np.exp(x[1])-c),0)
-        p_func[(0,1)] = d[1]*(sig**2/2 + self.Delta[1]*np.maximum(self.mu*(-x[1]),0))
-        p_func[(0,-1)] = d[1]*(sig**2/2 + self.Delta[1]*np.maximum(-self.mu*(-x[1]),0))
+        p_func[(0,1)] = d[1]*(sig**2/2 + self.Delta[1]*np.maximum(self.mubar*(-x[1]),0))
+        p_func[(0,-1)] = d[1]*(sig**2/2 + self.Delta[1]*np.maximum(-self.mubar*(-x[1]),0))
         p_func[(0,0,1)] = dt/self.Delta[2]
         return p_func
 
-    def P_tran_slice(self,c):
+    def P_slice(self,c):
         ii, jj = self.mesh_slice([0,0])
         row = ii*(self.N[1]-1) + jj
         diag = 1 - sum(self.p_func_slice((ii,jj),c).values())
@@ -563,7 +543,7 @@ class CT_nonstat_IFP(object):
         Dt_slice = self.Dt[:,:,0]
         b = Dt_slice*c_slice**(1-self.gamma)/(1-self.gamma) + np.exp(-self.rho*Dt_slice)*(Dt_slice/self.Delta[2])*V_imp_up
         D = np.exp(-self.rho*Dt_slice).reshape((self.M_slice,))
-        B = sp.eye(self.M_slice) - sp.diags(D)*self.P_tran_slice(c_slice)
+        B = sp.eye(self.M_slice) - sp.diags(D)*self.P_slice(c_slice)
         b, B = b/self.dt, B/self.dt
         return sp.linalg.spsolve(B, b.reshape((self.M_slice,))).reshape((self.N[0]-1,self.N[1]-1))
 
