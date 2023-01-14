@@ -47,7 +47,7 @@ c1,c2 = parameters.c1, parameters.c2
 colorFader = parameters.colorFader
 
 rho, r, gamma = parameters.rho, parameters.r, parameters.gamma
-mu, sigma = parameters.mu, parameters.sigma
+mubar, sigma = parameters.mubar, parameters.sigma
 tol, maxiter, maxiter_PFI = parameters.tol, parameters.maxiter, parameters.maxiter_PFI
 bnd, bnd_NS = parameters.bnd, parameters.bnd_NS
 
@@ -75,11 +75,11 @@ local_NA = NA
 true_val = true_nonstat_load(DT_dt, CT_dt_true, local_NA)
 
 
-X_true = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mu=mu,sigma=sigma,
+X_true = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
 N=N_true,NA=NA,N_c=N_c,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
 show_method=show_method,show_iter=show_iter,show_final=show_final,dt=DT_dt)
 
-Z_true = classes.CT_nonstat_IFP(rho=rho,r=r,gamma=gamma,mu=mu,sigma=sigma,
+Z_true = classes.CT_nonstat_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
 bnd=bnd_NS,N=(N_true[0],N_true[1],local_NA),maxiter=maxiter,maxiter_PFI=maxiter_PFI,
 tol=tol,show_method=show_method,show_iter=show_iter,show_final=show_final,dt=CT_dt_true)
 
@@ -108,10 +108,10 @@ def accuracy_data(true_val,N_set,DT_dt,CT_dt,framework='both',method='EGM'):
     for N in N_set:
         print("Number of gridpoints:", N)
         d_DT, d_CT, d_compare = {}, {}, {}
-        X[N] = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mu=mu,sigma=sigma,
+        X[N] = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
         N=N,NA=NA,N_c=N_c,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
         show_method=show_method,show_iter=show_iter,show_final=show_final,dt=DT_dt)
-        Z[N] = classes.CT_nonstat_IFP(rho=rho,r=r,gamma=gamma,mu=mu,sigma=sigma,
+        Z[N] = classes.CT_nonstat_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
         bnd=bnd_NS,N=(N[0],N[1],NA),maxiter=maxiter,maxiter_PFI=maxiter_PFI,
         tol=tol,show_method=show_method,show_iter=show_iter,show_final=show_final,dt=CT_dt_true)
         NA_scale_loc = int(local_NA/NA)
@@ -203,10 +203,10 @@ def time_data(N_set,DT_dt,CT_dt,runs, suppress_PFI=False):
         for N in N_set:
             print("Number of gridpoints:", N)
             d = {}
-            X[N] = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mu=mu,sigma=sigma,
+            X[N] = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
             N=N,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
             show_method=show_method,show_iter=show_iter,show_final=show_final,dt=DT_dt)
-            Z[N] = classes.CT_nonstat_IFP(rho=rho,r=r,gamma=gamma,mu=mu,sigma=sigma,
+            Z[N] = classes.CT_nonstat_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
             bnd=bnd_NS,N=(N[0],N[1],NA),maxiter=maxiter,maxiter_PFI=maxiter_PFI,
             tol=tol,show_method=show_method,show_iter=show_iter,show_final=show_final,dt=CT_dt_true)
             d[cols_time[0]] = X[N].nonstat_solve('EGM')[2]

@@ -26,7 +26,7 @@ Set parameters
 """
 
 rho, r, gamma = parameters.rho, parameters.r, parameters.gamma
-mu, sigma = parameters.mu, parameters.sigma
+mubar, sigma = parameters.mubar, parameters.sigma
 tol, maxiter, maxiter_PFI = parameters.tol, parameters.maxiter, parameters.maxiter_PFI
 bnd, bnd_NS = parameters.bnd, parameters.bnd_NS
 
@@ -41,13 +41,12 @@ CT_dt_big = parameters.CT_dt_big
 DT_dt = parameters.DT_dt
 NA = parameters.NA
 
-
 N = (100,10)
-X = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mu=mu,sigma=sigma,
+X = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
 N=N,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
 show_method=show_method,show_iter=show_iter,show_final=show_final,dt=1,NA=NA)
 print("Positive probabilities?", X.prob_check>0)
-Z = classes.CT_nonstat_IFP(rho=rho,r=r,gamma=gamma,mu=mu,sigma=sigma,bnd=bnd_NS,
+Z = classes.CT_nonstat_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,bnd=bnd_NS,
 N=(N[0],N[1],NA),maxiter=maxiter,tol=tol,show_method=show_method,
 show_iter=show_iter,show_final=show_final)
 
