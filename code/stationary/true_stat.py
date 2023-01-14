@@ -20,7 +20,7 @@ c1, c2 = parameters.c1, parameters.c2
 colorFader = parameters.colorFader
 
 rho, r, gamma = parameters.rho, parameters.r, parameters.gamma
-mu, sigma = parameters.mu, parameters.sigma
+mubar, sigma = parameters.mubar, parameters.sigma
 tol, maxiter, maxiter_PFI = parameters.tol, parameters.maxiter, parameters.maxiter_PFI
 bnd, bnd_NS = parameters.bnd, parameters.bnd_NS
 
@@ -39,7 +39,7 @@ def true_DT_stat(DT_dt):
         print("Value function for {0} framework and timestep {1} already exists".format('DT',DT_dt))
     else:
         print("Value function for {0} framework and timestep {1} does not exist".format('DT',DT_dt))
-        X = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mu=mu,sigma=sigma,
+        X = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
         N=N_true,N_c=N_c,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
         show_method=show_method,show_iter=show_iter,show_final=show_final,dt=DT_dt)
         V, c = X.solve_PFI('BF')[0:2]
@@ -54,7 +54,7 @@ def true_CT_stat(CT_dt):
         print("Value function for {0} framework and timestep {1} already exists".format('CT', CT_dt))
     else:
         print("Value function for {0} framework and timestep {1} does not exist".format('CT', CT_dt))
-        Y = classes.CT_stat_IFP(rho=rho,r=r,gamma=gamma,mu=mu,sigma=sigma,
+        Y = classes.CT_stat_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
         N=N_true,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
         show_method=show_method,show_iter=show_iter,show_final=show_final,dt=CT_dt)
         V, c = Y.solve_PFI()[0:2]

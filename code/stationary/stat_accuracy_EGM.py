@@ -25,7 +25,7 @@ c1,c2 = parameters.c1, parameters.c2
 colorFader = parameters.colorFader
 
 rho, r, gamma = parameters.rho, parameters.r, parameters.gamma
-mu, sigma = parameters.mu, parameters.sigma
+mubar, sigma = parameters.mubar, parameters.sigma
 tol, maxiter, maxiter_PFI = parameters.tol, parameters.maxiter, parameters.maxiter_PFI
 bnd, bnd_NS = parameters.bnd, parameters.bnd_NS
 
@@ -68,7 +68,7 @@ def accuracy_data(true_val,N_set,DT_dt):
     Pre-allocate all quantities
     """
     X, DT_EGM, DT_BF = {}, {}, {}
-    X['True'] = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mu=mu,sigma=sigma,
+    X['True'] = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
     N=N_true,N_c=N_c,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
     show_method=show_method,show_iter=show_iter,show_final=show_final,dt=DT_dt)
     print("First compute values on fine grid")
@@ -79,7 +79,7 @@ def accuracy_data(true_val,N_set,DT_dt):
     for N in N_set:
         print("Number of gridpoints:", N)
         d_DT_EGM, d_DT_BF, d_compare = {}, {}, {}
-        X[N] = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mu=mu,sigma=sigma,
+        X[N] = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
         N=N,N_c=N_c,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
         show_method=show_method,show_iter=show_iter,show_final=show_final,dt=DT_dt)
         DT_BF[N] = X[N].solve_PFI('BF')

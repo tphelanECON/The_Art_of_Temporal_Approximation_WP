@@ -54,7 +54,7 @@ c1, c2 = parameters.c1, parameters.c2
 colorFader = parameters.colorFader
 
 rho, r, gamma = parameters.rho, parameters.r, parameters.gamma
-mu, sigma = parameters.mu, parameters.sigma
+mubar, sigma = parameters.mubar, parameters.sigma
 tol, maxiter, maxiter_PFI = parameters.tol, parameters.maxiter, parameters.maxiter_PFI
 bnd, bnd_NS = parameters.bnd, parameters.bnd_NS
 
@@ -89,24 +89,20 @@ for relax in relax_list:
 cols_time.append('PFI')
 
 """
-Get the true values or state that they are yet-to-be-computed.
-Following does not COMPUTE anything. It just gets the data and tells us if it
-is missing.
+Get the true values or state that they are not in memory. Following does not
+COMPUTE anything. It just gets the data or tells us if it is missing.
 """
 
-
-
-X_true = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mu=mu,sigma=sigma,
+X_true = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
 N=N_true,N_c=N_c,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
 show_method=show_method,show_iter=show_iter,show_final=show_final,dt=DT_dt)
 
-Y_true = classes.CT_stat_IFP(rho=rho,r=r,gamma=gamma,mu=mu,sigma=sigma,
+Y_true = classes.CT_stat_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
 N=N_true,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
 show_method=show_method,show_iter=show_iter,show_final=show_final,dt=CT_dt_true)
 
 """
-Compare with true values. Note that because we use EGM in the run times,
-we ought to use it for the accuracy too.
+Compare with true values
 """
 
 def accuracy_data(true_val,N_set,DT_dt,CT_dt,framework='both',method='BF'):
@@ -122,10 +118,10 @@ def accuracy_data(true_val,N_set,DT_dt,CT_dt,framework='both',method='BF'):
     for N in N_set:
         print("Number of gridpoints:", N)
         d_DT, d_CT, d_compare = {}, {}, {}
-        X[N] = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mu=mu,sigma=sigma,
+        X[N] = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
         N=N,N_c=N_c,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
         show_method=show_method,show_iter=show_iter,show_final=show_final,dt=DT_dt)
-        Y[N] = classes.CT_stat_IFP(rho=rho,r=r,gamma=gamma,mu=mu,sigma=sigma,
+        Y[N] = classes.CT_stat_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
         N=N,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
         show_method=show_method,show_iter=show_iter,show_final=show_final,dt=CT_dt)
         def compare(f1,f2):
@@ -206,10 +202,10 @@ def time_data(N_set,DT_dt,CT_dt,runs,framework='DT',suppress_VFI=False):
         for N in N_set:
             print("Number of gridpoints:", N)
             d, d_iter = {}, {}
-            X[N] = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mu=mu,sigma=sigma,
+            X[N] = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
             N=N,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
             show_method=show_method,show_iter=show_iter,show_final=show_final,dt=DT_dt)
-            Y[N] = classes.CT_stat_IFP(rho=rho,r=r,gamma=gamma,mu=mu,sigma=sigma,
+            Y[N] = classes.CT_stat_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
             N=N,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
             show_method=show_method,show_iter=show_iter,show_final=show_final,dt=CT_dt)
             if framework=='DT':
@@ -298,7 +294,7 @@ def time_accuracy_figures(true_val,N_set,DT_dt,CT_dt,runs):
     plt.show()
 
 """
-Create tables. make_tables=1
+Create tables
 """
 
 runs=1
@@ -306,18 +302,18 @@ N_grid = np.linspace(np.log(50), np.log(1000), 10)
 N_set_big = [(int(np.rint(np.exp(n))),10) for n in N_grid]
 
 DT_dt = 10**0
-true_val = true_stat(DT_dt, CT_dt_true)
+true_val = true_stat_load(DT_dt, CT_dt_true)
 accuracy_tables(true_val, parameters.N_set, DT_dt, CT_dt_true, 'both')
 accuracy_tables(true_val, parameters.N_set, DT_dt, CT_dt_mid, 'CT')
 accuracy_tables(true_val, parameters.N_set, DT_dt, CT_dt_big, 'CT')
 DT_dt = 10**-1
-true_val = true_stat(DT_dt, CT_dt_true)
+true_val = true_stat_load(DT_dt, CT_dt_true)
 accuracy_tables(true_val, parameters.N_set, DT_dt, CT_dt_true, 'both')
 DT_dt = 10**-2
-true_val = true_stat(DT_dt, CT_dt_true)
+true_val = true_stat_load(DT_dt, CT_dt_true)
 accuracy_tables(true_val, parameters.N_set, DT_dt, CT_dt_true, 'both')
 DT_dt = 10**0
-true_val = true_stat(DT_dt, CT_dt_true)
+true_val = true_stat_load(DT_dt, CT_dt_true)
 time_tables(true_val, parameters.N_set, DT_dt, CT_dt_big, runs, 'DT')
 time_tables(true_val, parameters.N_set, DT_dt, CT_dt_big, runs, 'CT')
 time_accuracy_figures(true_val, N_set_big, DT_dt, CT_dt_big, runs)
