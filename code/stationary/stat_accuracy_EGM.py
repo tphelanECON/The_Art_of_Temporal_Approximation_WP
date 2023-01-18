@@ -52,18 +52,18 @@ cols_compare = ['$||c_{E} - c_{B}||_1$',
 Functions for data construction and table creation
 """
 
-def true_DT_stat(DT_dt):
+def true_DT_stat(DT_dt,prob):
     true_val = {}
-    destin = '../../main/output/true_V_{0}_stat_{1}.csv'.format('DT',int(10**3*DT_dt))
+    destin = '../../main/output/true_V_{0}_stat_{1}_{2}.csv'.format('DT',int(10**3*DT_dt),prob)
     if os.path.exists(destin):
         V = pd.read_csv(destin)
-    destin = '../../main/output/true_c_{0}_stat_{1}.csv'.format('DT',int(10**3*DT_dt))
+    destin = '../../main/output/true_V_{0}_stat_{1}_{2}.csv'.format('DT',int(10**3*DT_dt),prob)
     if os.path.exists(destin):
         c = pd.read_csv(destin)
     true_val['DT'] = np.array(V), np.array(c)
     return true_val
 
-def accuracy_data(true_val,N_set,DT_dt):
+def accuracy_data(true_val,N_set,DT_dt,prob):
     """
     Pre-allocate all quantities
     """
@@ -82,8 +82,8 @@ def accuracy_data(true_val,N_set,DT_dt):
         X[N] = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
         N=N,N_c=N_c,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
         show_method=show_method,show_iter=show_iter,show_final=show_final,dt=DT_dt)
-        DT_BF[N] = X[N].solve_PFI('BF')
-        DT_EGM[N] = X[N].solve_MPFI('EGM',0,DT_BF[N][0])
+        DT_BF[N] = X[N].solve_PFI('BF',prob)
+        DT_EGM[N] = X[N].solve_MPFI('EGM',0,DT_BF[N][0],prob)
         def compare(f1,f2):
             f2_big = np.zeros((X['True'].N[0]-1,X['True'].N[1]-1))
             for j in range(X['True'].N[1]-1):
@@ -113,14 +113,14 @@ def accuracy_data(true_val,N_set,DT_dt):
         data_compare.append(d_compare)
     return data_DT_EGM, data_DT_BF, data_compare
 
-def accuracy_tables(true_val,N_set,DT_dt):
-    data_DT_EGM, data_DT_BF, data_compare = accuracy_data(true_val,N_set,DT_dt)
+def accuracy_tables(true_val,N_set,DT_dt,prob):
+    data_DT_EGM, data_DT_BF, data_compare = accuracy_data(true_val,N_set,DT_dt,prob)
 
     df = pd.DataFrame(data=data_DT_EGM,index=N_set,columns=cols)
     df = df[cols].round(decimals=n_round_acc)
     df.index.names = ['Grid size']
 
-    destin = '../../main/figures/DT_EGM_accuracy_stat_{0}.tex'.format(int(10**3*DT_dt))
+    destin = '../../main/figures/DT_EGM_accuracy_stat_{0}_{1}.tex'.format(int(10**3*DT_dt),prob)
     with open(destin,'w') as tf:
         tf.write(df.to_latex(escape=False,column_format='cccccc'))
 
@@ -128,7 +128,7 @@ def accuracy_tables(true_val,N_set,DT_dt):
     df = df[cols].round(decimals=n_round_acc)
     df.index.names = ['Grid size']
 
-    destin = '../../main/figures/DT_BF_accuracy_stat_{0}.tex'.format(int(10**3*DT_dt))
+    destin = '../../main/figures/DT_BF_accuracy_stat_{0}_{1}.tex'.format(int(10**3*DT_dt),prob)
     with open(destin,'w') as tf:
         tf.write(df.to_latex(escape=False,column_format='cccccc'))
 
@@ -136,7 +136,7 @@ def accuracy_tables(true_val,N_set,DT_dt):
     df = df[cols_compare].round(decimals=n_round_acc)
     df.index.names = ['Grid size']
 
-    destin = '../../main/figures/DT_EGM_BF_accuracy_stat_{0}.tex'.format(int(10**3*DT_dt))
+    destin = '../../main/figures/DT_EGM_BF_accuracy_stat_{0}_{1}.tex'.format(int(10**3*DT_dt),prob)
     with open(destin,'w') as tf:
         tf.write(df.to_latex(escape=False,column_format='cccccc'))
 
@@ -144,5 +144,5 @@ def accuracy_tables(true_val,N_set,DT_dt):
 Create tables
 """
 DT_dt = 1
-true_val = true_DT_stat(DT_dt)
-accuracy_tables(true_val, parameters.N_set, DT_dt)
+true_val = true_DT_stat(DT_dt,prob='KD')
+accuracy_tables(true_val, parameters.N_set, DT_dt, prob='KD')
