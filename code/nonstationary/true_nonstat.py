@@ -41,64 +41,74 @@ CT_dt_mid = parameters.CT_dt_mid
 CT_dt_big = parameters.CT_dt_big
 DT_dt = parameters.DT_dt
 
-def true_DT_nonstat(DT_dt):
-    destin = '../../main/output/true_V_{0}_nonstat_{1}.csv'.format('DT', int(10**3*DT_dt))
+def true_DT_nonstat(DT_dt,prob):
+    destin = '../../main/output/true_V_{0}_nonstat_{1}_{2}.csv'.format('DT',int(10**3*DT_dt),prob)
     if os.path.exists(destin):
-        print("Value function for {0} framework and timestep {1} already exists".format('DT',DT_dt))
+        print("Value function for nonstationary {0} framework and timestep {1} with {2} transitions already exists".format('DT',DT_dt,prob))
     else:
-        print("Value function for {0} framework and timestep {1} does not exist".format('DT',DT_dt))
+        print("Value function for nonstationary {0} framework and timestep {1} with {2} transitions does not exist".format('DT',DT_dt,prob))
         X = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
-        N=N_true,NA=NA,N_c=N_c,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
+        N=N_true,N_c=N_c,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
         show_method=show_method,show_iter=show_iter,show_final=show_final,dt=DT_dt)
-        V, c = X.nonstat_solve('BF')[0:2]
-        #convert to 2-dimensional arrays.
+        print("Now solving for {0} gridpoints".format(N_true))
+        V, c = X.nonstat_solve('BF',prob)[0:2]
         V, c = V.reshape(V.shape[0], -1), c.reshape(c.shape[0], -1)
-        destin = '../../main/output/true_V_{0}_nonstat_{1}.csv'.format('DT', int(10**3*DT_dt))
+        destin = '../../main/output/true_V_{0}_nonstat_{1}_{2}.csv'.format('DT', int(10**3*DT_dt), prob)
         pd.DataFrame(V).to_csv(destin, index=False)
-        destin = '../../main/output/true_c_{0}_nonstat_{1}.csv'.format('DT', int(10**3*DT_dt))
+        destin = '../../main/output/true_c_{0}_nonstat_{1}_{2}.csv'.format('DT', int(10**3*DT_dt), prob)
         pd.DataFrame(c).to_csv(destin, index=False)
 
 def true_CT_nonstat(CT_dt,NA):
     destin = '../../main/output/true_V_{0}_nonstat_{1}_{2}.csv'.format('CT', int(10**6*CT_dt), NA)
     if os.path.exists(destin):
-        print("Value function for {0} framework and timestep {1} and {2} ages already exists".format('CT', CT_dt, NA))
+        print("Value function for nonstationary {0} framework and timestep {1} and {2} ages already exists".format('CT', CT_dt, NA))
     else:
-        print("Value function for {0} framework and timestep {1} and {2} ages already exists".format('CT', CT_dt, NA))
+        print("Value function for nonstationary {0} framework and timestep {1} and {2} ages does not exist".format('CT', CT_dt, NA))
         Z = classes.CT_nonstat_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
         bnd=bnd_NS,N=(N_true[0],N_true[1],NA),maxiter=maxiter,maxiter_PFI=maxiter_PFI,
         tol=tol,show_method=show_method,show_iter=show_iter,show_final=show_final,dt=CT_dt)
         V, c = Z.solve_seq_imp()[0:2]
-        #convert to 2-dimensional arrays.
         V, c = V.reshape(V.shape[0], -1), c.reshape(c.shape[0], -1)
         destin = '../../main/output/true_V_{0}_nonstat_{1}_{2}.csv'.format('CT', int(10**6*CT_dt), NA)
         pd.DataFrame(V).to_csv(destin, index=False)
         destin = '../../main/output/true_c_{0}_nonstat_{1}_{2}.csv'.format('CT', int(10**6*CT_dt), NA)
         pd.DataFrame(c).to_csv(destin, index=False)
 
+"""
+Now make the true discrete-time and continuous-time quantities
+"""
+
 true_CT_nonstat(CT_dt_true,parameters.NA)
 true_CT_nonstat(CT_dt_true,parameters.NA_true)
-true_DT_nonstat(10**0)
-#true_DT_nonstat(10**-1)
-#true_DT_nonstat(10**-2)
+true_DT_nonstat(10**0,'KD')
+true_DT_nonstat(10**0,'Tauchen')
 
-def true_nonstat_load(DT_dt,CT_dt,NA):
+#NA in the following will be the number of agesteps in the continuous-time case.
+def true_nonstat_load(DT_dt,CT_dt,CT_NA,prob):
     true_val = {}
-    destin = '../../main/output/true_V_{0}_nonstat_{1}.csv'.format('DT',int(10**3*DT_dt))
+    destin = '../../main/output/true_V_{0}_nonstat_{1}_{2}.csv'.format('DT',int(10**3*DT_dt),prob)
     if os.path.exists(destin):
         V = pd.read_csv(destin)
-        V = np.array(V).reshape((N_true[0]-1,N_true[1]-1,NA-1))
-    destin = '../../main/output/true_c_{0}_nonstat_{1}.csv'.format('DT',int(10**3*DT_dt))
+        V = np.array(V).reshape((N_true[0]-1,N_true[1]-1,parameters.NA-1))
+    destin = '../../main/output/true_c_{0}_nonstat_{1}_{2}.csv'.format('DT',int(10**3*DT_dt),prob)
     if os.path.exists(destin):
         c = pd.read_csv(destin)
-        c = np.array(c).reshape((N_true[0]-1,N_true[1]-1,NA-1))
+        c = np.array(c).reshape((N_true[0]-1,N_true[1]-1,parameters.NA-1))
     true_val['DT'] = V, c
-    destin = '../../main/output/true_V_{0}_nonstat_{1}_{2}.csv'.format('CT', int(10**6*CT_dt), NA)
+    destin = '../../main/output/true_V_{0}_nonstat_{1}_{2}.csv'.format('CT',int(10**6*CT_dt),CT_NA)
     if os.path.exists(destin):
         V = pd.read_csv(destin)
-        V = np.array(V).reshape((N_true[0]-1,N_true[1]-1,NA-1))
-    destin = '../../main/output/true_c_{0}_nonstat_{1}_{2}.csv'.format('CT', int(10**6*CT_dt), NA)
+        V = np.array(V).reshape((N_true[0]-1,N_true[1]-1,CT_NA-1))
+    destin = '../../main/output/true_c_{0}_nonstat_{1}_{2}.csv'.format('CT',int(10**6*CT_dt),CT_NA)
     if os.path.exists(destin):
         c = pd.read_csv(destin)
-        c = np.array(c).reshape((N_true[0]-1,N_true[1]-1,NA-1))
+        c = np.array(c).reshape((N_true[0]-1,N_true[1]-1,CT_NA-1))
     true_val['CT'] = V, c
     return true_val
+
+true_val = {}
+
+DT_dt, CT_dt = 10**0, 10*-6
+for prob in ['KD','Tauchen']:
+    true_val['(coarse, {0})'.format(prob)] = true_nonstat_load(DT_dt,CT_dt,parameters.NA,prob)
+    true_val['(fine, {0})'.format(prob)] = true_nonstat_load(DT_dt,CT_dt,parameters.NA_true,prob)
