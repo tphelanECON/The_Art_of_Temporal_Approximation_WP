@@ -7,7 +7,7 @@ At the moment I think we need five of these:
     * one for the discrete-time case with Tauchen transitions, using dt = 1.
 
 For the discrete-time Tauchen we use MPFI not PFI because the transition matrix
-is much less sparse and convergence would take a very long time. 
+is much less sparse and convergence would take a very long time.
 """
 
 import os, sys, inspect
@@ -42,9 +42,9 @@ DT_dt = parameters.DT_dt
 def true_DT_stat(DT_dt,prob):
     destin = '../../main/output/true_V_{0}_stat_{1}_{2}.csv'.format('DT',int(10**3*DT_dt),prob)
     if os.path.exists(destin):
-        print("Value function for {0} framework and timestep {1} with {2} transitions already exists".format('DT',DT_dt,prob))
+        print("Value function for stationary {0} framework and timestep {1} with {2} transitions already exists".format('DT',DT_dt,prob))
     else:
-        print("Value function for {0} framework and timestep {1} with {2} transitions does not exist".format('DT',DT_dt,prob))
+        print("Value function for stationary {0} framework and timestep {1} with {2} transitions does not exist".format('DT',DT_dt,prob))
         X = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
         N=N_true,N_c=N_c,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
         show_method=show_method,show_iter=show_iter,show_final=show_final,dt=DT_dt)
@@ -62,9 +62,9 @@ def true_DT_stat(DT_dt,prob):
 def true_CT_stat(CT_dt):
     destin = '../../main/output/true_V_{0}_stat_{1}.csv'.format('CT',int(10**6*CT_dt))
     if os.path.exists(destin):
-        print("Value function for {0} framework and timestep {1} already exists".format('CT',CT_dt))
+        print("Value function for stationary {0} framework and timestep {1} already exists".format('CT',CT_dt))
     else:
-        print("Value function for {0} framework and timestep {1} does not exist".format('CT',CT_dt))
+        print("Value function for stationary {0} framework and timestep {1} does not exist".format('CT',CT_dt))
         Y = classes.CT_stat_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
         N=N_true,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
         show_method=show_method,show_iter=show_iter,show_final=show_final,dt=CT_dt)
