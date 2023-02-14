@@ -49,7 +49,11 @@ tol, maxiter, maxiter_PFI = parameters.tol, parameters.maxiter, parameters.maxit
 bnd, bnd_NS = parameters.bnd, parameters.bnd_NS
 
 show_iter, show_method, show_final = 1, 1, 1
-N_true, N_c = parameters.N_true, parameters.N_c
+N_true = parameters.N_true
+NA = parameters.NA
+NA_true = parameters.NA_true
+N_t = parameters.N_t
+N_c = parameters.N_c
 n_round_acc = parameters.n_round_acc
 n_round_time = parameters.n_round_time
 CT_dt_true = parameters.CT_dt_true
@@ -69,6 +73,8 @@ relax_list = parameters.relax_list
 cols_true = parameters.cols_true
 cols_compare = parameters.cols_compare
 cols_time_nonstat = parameters.cols_time_nonstat
+cols_time_nonstat_decomp = parameters.cols_time_nonstat_decomp
+
 
 def accuracy_data(true_val,N_set,DT_dt,CT_dt,framework='both',method='EGM',prob='KD'):
     X, Z, DT, CT = {}, {}, {}, {}
@@ -84,7 +90,7 @@ def accuracy_data(true_val,N_set,DT_dt,CT_dt,framework='both',method='EGM',prob=
         print("Number of gridpoints:", N)
         d_DT, d_CT, d_compare = {}, {}, {}
         X[N] = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
-        N=N,NA=parameters.NA,N_c=N_c,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
+        N=N,NA=NA,N_t=N_t,N_c=N_c,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
         show_method=show_method,show_iter=show_iter,show_final=show_final,dt=DT_dt)
         Z[N] = classes.CT_nonstat_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
         bnd=bnd_NS,N=(N[0],N[1],parameters.NA),maxiter=maxiter,maxiter_PFI=maxiter_PFI,
@@ -184,35 +190,50 @@ def accuracy_tables(true_val,N_set,DT_dt,CT_dt,framework='both',method='EGM',pro
 #no need for framework in the following. only use three candidates.
 def time_data(N_set,DT_dt,CT_dt,runs,prob='KD',run_PFI=True):
     df = pd.DataFrame(data=0,index=N_set,columns=cols_time_nonstat)
+    df_decomp = pd.DataFrame(data=0,index=N_set,columns=cols_time_nonstat_decomp)
     for i in range(runs):
-        time_data = []
+        #cols_time_nonstat_decomp = ['DT policy','DT value','CT policy','CT value']
+        time_data, time_data_decomp = [], []
         X, Z = {}, {}
         for N in N_set:
             print("Number of gridpoints:", N)
-            d = {}
+            d, d_decomp = {}, {}
             X[N] = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
-            N=N,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
+            N=N,NA=NA,N_t=N_t,N_c=N_c,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
             show_method=show_method,show_iter=show_iter,show_final=show_final,dt=DT_dt)
             Z[N] = classes.CT_nonstat_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
             bnd=bnd_NS,N=(N[0],N[1],NA),maxiter=maxiter,maxiter_PFI=maxiter_PFI,
             tol=tol,show_method=show_method,show_iter=show_iter,show_final=show_final,dt=CT_dt_true)
-            d[cols_time_nonstat[0]] = X[N].nonstat_solve('EGM',prob)[2]
-            d[cols_time_nonstat[1]] = Z[N].solve_seq_imp()[2]
+            sol_DT = X[N].nonstat_solve('EGM',prob)
+            sol_CT = Z[N].solve_seq_imp()
+            d[cols_time_nonstat[0]] = sol_DT[2]
+            d_decomp[cols_time_nonstat_decomp[0]] = sol_DT[3].sum(axis=1)[0]
+            d_decomp[cols_time_nonstat_decomp[1]] = sol_DT[3].sum(axis=1)[1]
+            d[cols_time_nonstat[1]] = sol_CT[2]
+            d_decomp[cols_time_nonstat_decomp[2]] = sol_CT[3].sum(axis=1)[0]
+            d_decomp[cols_time_nonstat_decomp[3]] = sol_CT[3].sum(axis=1)[1]
             if (N[0] < 100) and (run_PFI==True):
                 d[cols_time_nonstat[2]] = Z[N].solve_PFI()[2]
             else:
                 d[cols_time_nonstat[2]] = np.Inf
             time_data.append(d)
+            time_data_decomp.append(d_decomp)
         df = df + pd.DataFrame(data=time_data,index=N_set,columns=cols_time_nonstat)
-    return df.round(decimals=n_round_time)/runs
+        df_decomp = df_decomp + pd.DataFrame(data=time_data_decomp,index=N_set,columns=cols_time_nonstat_decomp)
+    return df.round(decimals=n_round_time)/runs, df_decomp.round(decimals=n_round_time)/runs
 
 def time_tables(true_val,N_set,DT_dt,CT_dt,runs,prob='KD'):
-    df = time_data(N_set,DT_dt,CT_dt,runs,prob)
-    df.index.names = ['Grid size']
+    data = time_data(N_set,DT_dt,CT_dt,runs,prob,run_PFI=False)
+    df, df_decomp = data
+    df.index.names, df_decomp.index.names = ['Grid size'], ['Grid size']
 
     destin = '../../main/figures/DT_CT_speed_nonstat_{0}_{1}_{2}.tex'.format(int(1000*DT_dt),int(10**6*CT_dt),prob)
     with open(destin,'w') as tf:
         tf.write(df.to_latex(escape=False,column_format='c'*(len(cols_time_nonstat)+1)))
+
+    destin = '../../main/figures/DT_CT_speed_nonstat_{0}_{1}_{2}_decomp.tex'.format(int(1000*DT_dt),int(10**6*CT_dt),prob)
+    with open(destin,'w') as tf:
+        tf.write(df_decomp.to_latex(escape=False,column_format='c'*(len(cols_time_nonstat)+1)))
 
 """
 Use EGM for the accuracy in the following, because that is what is used in the time tables.
@@ -222,7 +243,7 @@ def time_accuracy_data(true_val,N_set,DT_dt,CT_dt,runs,prob='KD'):
     DT['accuracy'], CT['accuracy'] = [], []
     DT['time'], CT['time'] = [], []
     df_acc_DT, df_acc_CT, df_acc_compare = accuracy_data(true_val,N_set,DT_dt,CT_dt,framework='both',method='EGM',prob=prob)
-    df_time = time_data(N_set,DT_dt,CT_dt,runs,prob,run_PFI=False)
+    df_time = time_data(N_set,DT_dt,CT_dt,runs,prob,run_PFI=False)[0]
     for i in range(len(N_set)):
         DT['accuracy'].append(df_acc_DT.iloc[i,0])
         CT['accuracy'].append(df_acc_CT.iloc[i,0])
@@ -252,7 +273,7 @@ Create tables
 runs=10
 DT_dt = 10**0
 CT_dt = CT_dt_true
-prob='KD'
+prob = 'KD'
 true_val = true_nonstat_load(DT_dt, CT_dt_true, parameters.NA, prob)
 N_set = parameters.N_set
 accuracy_tables(true_val, N_set, DT_dt, CT_dt_true, 'both', 'BF', prob)
@@ -264,8 +285,11 @@ accuracy_tables(true_val, N_set, DT_dt, CT_dt_true, 'DT', 'EGM', prob)
 """
 Time (and number of iterations) for convergence (need to reload original true)
 """
-true_val = true_nonstat_load(DT_dt, CT_dt_true, parameters.NA, prob)
-time_tables(true_val, N_set, DT_dt, CT_dt_true, runs, prob)
+runs=10
+for prob in ['KD','Tauchen']:
+    true_val = true_nonstat_load(DT_dt, CT_dt_true, parameters.NA, prob)
+    time_tables(true_val, N_set, DT_dt, CT_dt_true, runs, prob)
+
 """
 Speed versus accuracy (both KD and Tauchen)
 """

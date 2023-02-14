@@ -10,6 +10,9 @@ version of the code the difference were of the order of 10**-12 or 10**-13.
 
 However, differences are smaller than the tolerance used, and several orders of
 mangitude small than the differences between coarse and fine grids.
+
+We have a more basic problem: we need to ensure that the naive and the sequential
+PFI are
 """
 
 import os, sys, inspect
@@ -20,7 +23,7 @@ sys.path.insert(0, parentdir)
 import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
-import time, classes, parameters, classes_old
+import time, classes, parameters #, classes_old
 
 c1,c2 = parameters.c1, parameters.c2
 colorFader = parameters.colorFader
@@ -84,5 +87,19 @@ Create tables
 """
 
 CT_dt = CT_dt_true
-N_set = [(50,10),(100,10),(150,10),(200,10)]
-accuracy_tables(N_set,CT_dt)
+N_set = [(50,10),(100,10),(150,10)]
+#accuracy_tables(N_set,CT_dt)
+
+data_compare = accuracy_data(N_set,CT_dt)
+
+N = (50,10)
+Z = classes.CT_nonstat_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
+bnd=bnd_NS,N=(N[0],N[1],NA),maxiter=maxiter,maxiter_PFI=maxiter_PFI,
+tol=tol,show_method=show_method,show_iter=show_iter,show_final=show_final,dt=CT_dt)
+n = Z.solve_PFI()
+s = Z.solve_seq_imp()
+
+#seems to be some missing mass somewhere. There must be.
+
+cdiff = n[1]- s[1]
+cdiff2 = n[1]- Z.polupdate(s[0])

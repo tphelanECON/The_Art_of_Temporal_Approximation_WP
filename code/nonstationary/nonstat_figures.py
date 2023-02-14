@@ -30,22 +30,23 @@ mubar, sigma = parameters.mubar, parameters.sigma
 tol, maxiter, maxiter_PFI = parameters.tol, parameters.maxiter, parameters.maxiter_PFI
 bnd, bnd_NS = parameters.bnd, parameters.bnd_NS
 
-N_true, N_c = parameters.N_true, parameters.N_c
+N_true = parameters.N_true
 show_iter, show_method, show_final = 1, 1, 1
-N_true, N_c = parameters.N_true, parameters.N_c
+NA = parameters.NA
+NA_true = parameters.NA_true
+N_t = parameters.N_t
+N_c = parameters.N_c
 n_round_acc = parameters.n_round_acc
 n_round_time = parameters.n_round_time
 CT_dt_true = parameters.CT_dt_true
 CT_dt_mid = parameters.CT_dt_mid
 CT_dt_big = parameters.CT_dt_big
 DT_dt = parameters.DT_dt
-NA = parameters.NA
 
-N = (100,10)
+N = (200,10)
 X = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
-N=N,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
-show_method=show_method,show_iter=show_iter,show_final=show_final,dt=1,NA=NA)
-print("Positive probabilities?", X.prob_check>0)
+N=N,NA=NA,N_t=N_t,N_c=N_c,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
+show_method=show_method,show_iter=show_iter,show_final=show_final,dt=1)
 Z = classes.CT_nonstat_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,bnd=bnd_NS,
 N=(N[0],N[1],NA),maxiter=maxiter,tol=tol,show_method=show_method,
 show_iter=show_iter,show_final=show_final)

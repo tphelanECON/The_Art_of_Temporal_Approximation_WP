@@ -31,9 +31,11 @@ tol, maxiter, maxiter_PFI = parameters.tol, parameters.maxiter, parameters.maxit
 bnd, bnd_NS = parameters.bnd, parameters.bnd_NS
 
 show_iter, show_method, show_final = 1, 1, 1
-N_true, N_c = parameters.N_true, parameters.N_c
-NA_true = parameters.NA_true
+N_true = parameters.N_true
 NA = parameters.NA
+NA_true = parameters.NA_true
+N_t = parameters.N_t
+N_c = parameters.N_c
 n_round_acc = parameters.n_round_acc
 n_round_time = parameters.n_round_time
 CT_dt_true = parameters.CT_dt_true
@@ -48,7 +50,7 @@ def true_DT_nonstat(DT_dt,prob):
     else:
         print("Value function for nonstationary {0} framework and timestep {1} with {2} transitions does not exist".format('DT',DT_dt,prob))
         X = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
-        N=N_true,N_c=N_c,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
+        N=N_true,NA=NA,N_t=N_t,N_c=N_c,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
         show_method=show_method,show_iter=show_iter,show_final=show_final,dt=DT_dt)
         print("Now solving for {0} gridpoints".format(N_true))
         V, c = X.nonstat_solve('BF',prob)[0:2]
