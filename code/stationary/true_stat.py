@@ -25,13 +25,19 @@ from scipy.interpolate import interp1d
 c1, c2 = parameters.c1, parameters.c2
 colorFader = parameters.colorFader
 
+c1, c2 = parameters.c1, parameters.c2
+colorFader = parameters.colorFader
+
 rho, r, gamma = parameters.rho, parameters.r, parameters.gamma
 mubar, sigma = parameters.mubar, parameters.sigma
 tol, maxiter, maxiter_PFI = parameters.tol, parameters.maxiter, parameters.maxiter_PFI
 bnd, bnd_NS = parameters.bnd, parameters.bnd_NS
 
 show_iter, show_method, show_final = 1, 1, 1
-N_true, N_c = parameters.N_true, parameters.N_c
+N_true = parameters.N_true
+NA = parameters.NA
+N_t = parameters.N_t
+N_c = parameters.N_c
 n_round_acc = parameters.n_round_acc
 n_round_time = parameters.n_round_time
 CT_dt_true = parameters.CT_dt_true
@@ -46,14 +52,15 @@ def true_DT_stat(DT_dt,prob):
     else:
         print("Value function for stationary {0} framework and timestep {1} with {2} transitions does not exist".format('DT',DT_dt,prob))
         X = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
-        N=N_true,N_c=N_c,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
+        N=N_true,NA=NA,N_t=N_t,N_c=N_c,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
         show_method=show_method,show_iter=show_iter,show_final=show_final,dt=DT_dt)
         print("Now solving for {0} gridpoints".format(N_true))
         if prob=='KD':
             V, c = X.solve_PFI(method='BF',prob=prob)[0:2]
         else:
-            V_init = X.V(X.c0,'KD')
-            V, c = X.solve_MPFI(method='BF',M=100,V_init=V_init,prob=prob)[0:2]
+            #V_init = X.V(X.c0,'KD')
+            #V, c = X.solve_MPFI(method='BF',M=100,V_init=V_init,prob=prob)[0:2]
+            V, c = X.solve_PFI(method='BF',prob=prob)[0:2]
         destin = '../../main/output/true_V_{0}_stat_{1}_{2}.csv'.format('DT',int(10**3*DT_dt),prob)
         pd.DataFrame(V).to_csv(destin, index=False)
         destin = '../../main/output/true_c_{0}_stat_{1}_{2}.csv'.format('DT',int(10**3*DT_dt),prob)

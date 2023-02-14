@@ -8,8 +8,8 @@ Relevant class constructors in classes.py:
     DT_IFP: discrete-time IFP (stationary and age-dependent)
     CT_stat_IFP: continuous-time stationary IFP
 
-The example plots will have the same grid paramters, and therefore do not need
-to be indexed by grid or timestep.
+The example plots will have the same grid parameters, and therefore do not need
+to be indexed by grid or timestep. They are just examples.
 """
 
 import os, sys, inspect
@@ -33,15 +33,22 @@ mubar, sigma = parameters.mubar, parameters.sigma
 tol, maxiter, maxiter_PFI = parameters.tol, parameters.maxiter, parameters.maxiter_PFI
 bnd, bnd_NS = parameters.bnd, parameters.bnd_NS
 show_method, show_iter, show_final = parameters.show_method, parameters.show_iter, parameters.show_final
-show_iter=1
 
-N, NA = (200,10), 60
-DT_dt = 10**0
-CT_dt = 10**-6
+N, NA = (100,10), 60
+DT_dt = parameters.DT_dt
+CT_dt = parameters.CT_dt_true
 
 X = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,N=N,bnd=bnd,
-NA=NA,maxiter=maxiter,tol=tol,show_method=show_method,show_iter=show_iter,
+NA=NA,N_t=1,maxiter=maxiter,tol=tol,show_method=show_method,show_iter=show_iter,
 show_final=show_final,dt=DT_dt)
+
+W = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,N=N,bnd=bnd,
+NA=NA,N_t=10,maxiter=maxiter,tol=tol,show_method=show_method,show_iter=show_iter,
+show_final=show_final,dt=DT_dt)
+
+sol = {}
+for class_instance in [X, W]:
+    sol[class_instance] = class_instance.solve_PFI('EGM',prob='KD')
 
 Y = classes.CT_stat_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,N=N,
 bnd=bnd,maxiter=maxiter,tol=tol,show_method=show_method,show_iter=show_iter,
@@ -85,7 +92,7 @@ for pol_method in pol_method_list:
         plt.title('Value functions (discrete-time, {0}, {1})'.format(pol_method, val_method))
         destin = '../../main/figures/DT_V_{0}_{1}.eps'.format(pol_method, val_method)
         plt.savefig(destin, format='eps', dpi=1000)
-        #plt.show()()
+        plt.show()
         fig, ax = plt.subplots()
         for j in range(N[1]-1):
             color = colorFader(c1,c2,j/(N[1]-1))
@@ -99,7 +106,7 @@ for pol_method in pol_method_list:
         plt.title('Policy functions (discrete-time, {0}, {1})'.format(pol_method, val_method))
         destin = '../../main/figures/DT_c_{0}_{1}.eps'.format(pol_method, val_method)
         plt.savefig(destin, format='eps', dpi=1000)
-        #plt.show()()
+        plt.show()
         plt.close()
 
 fig, ax = plt.subplots()
@@ -115,7 +122,7 @@ plt.legend()
 plt.title('Value functions (continuous-time)')
 destin = '../../main/figures/CT_V.eps'
 plt.savefig(destin, format='eps', dpi=1000)
-#plt.show()()
+plt.show()
 plt.close()
 
 fig, ax = plt.subplots()
@@ -131,7 +138,7 @@ plt.legend()
 plt.title('Policy functions (continuous-time)')
 destin = '../../main/figures/CT_c.eps'
 plt.savefig(destin, format='eps', dpi=1000)
-#plt.show()()
+plt.show()
 plt.close()
 
 fig, ax = plt.subplots()
@@ -148,7 +155,7 @@ plt.legend()
 plt.title('Drift (continuous-time)')
 destin = '../../main/figures/CT_drift_optimal.eps'
 plt.savefig(destin, format='eps', dpi=1000)
-#plt.show()()
+plt.show()
 #plt.close()
 
 """
@@ -172,7 +179,7 @@ plt.legend()
 plt.title('Value function differences')
 destin = '../../main/figures/DT_CT_compare_V.eps'
 plt.savefig(destin, format='eps', dpi=1000)
-#plt.show()()
+plt.show()
 
 fig, ax = plt.subplots()
 for j in range(N[1]-1):
@@ -187,7 +194,7 @@ plt.legend()
 plt.title('Policy function differences')
 destin = '../../main/figures/DT_CT_compare_c.eps'
 plt.savefig(destin, format='eps', dpi=1000)
-#plt.show()()
+plt.show()
 
 """
 Now the difference in assets in the stationary environment
@@ -208,45 +215,4 @@ plt.legend()
 plt.title('Difference in assets $\Delta b$ in stationary problem')
 destin = '../../main/figures/DT_stat_drift.eps'
 plt.savefig(destin, format='eps', dpi=1000)
-#plt.show()()
-
-"""
-Now plot the minimum Delta_t for which convergence is assured.
-
-
-fig, ax = plt.subplots()
-for j in range(N[1]-1):
-    color = colorFader(c1,c2,j/(N[1]-1))
-    #c, y = DT[(pol_method,'VFI')][1][:,j], np.exp(X.grid[1][:])
-    if j in [0,N[1]-2]:
-        inc = Y.ybar*np.round(np.exp(Y.grid[1][j]),2)
-        ax.plot(Y.grid[0], Y.c0[:,j], color=color, linestyle='dotted', label="Income {0}".format(inc), linewidth=1)
-        ax.plot(Y.grid[0], CT[1][:,j], color=color, label="Income {0}".format(inc), linewidth=1)
-    else:
-        ax.plot(Y.grid[0], Y.c0[:,j], color=color, linestyle='dotted', label="Income {0}".format(inc), linewidth=1)
-        ax.plot(Y.grid[0], CT[1][:,j], color=color, linewidth=1)
-plt.xlabel('Assets $b$')
-#plt.legend()
-#plt.title('Difference in assets $\Delta b$ in stationary problem')
-#destin = '../../main/figures/DT_stat_drift.eps'
-#plt.savefig(destin, format='eps', dpi=1000)
-#plt.show()()
-
-fig, ax = plt.subplots()
-for j in range(N[1]-1):
-    color = colorFader(c1,c2,j/(N[1]-1))
-    c, y = CT[1], np.exp(X.grid[1][:])
-    if j in [0,N[1]-2]:
-        inc = X.ybar*np.round(np.exp(X.grid[1][j]),2)
-        ax.plot(X.grid[0], (1+X.r)*(X.grid[0] + y[j] - c[:,j]) - X.grid[0], color=color, label="Income {0}".format(inc), linewidth=1)
-    else:
-        ax.plot(X.grid[0], (1+X.r)*(X.grid[0] + y[j] - c[:,j]) - X.grid[0], color=color, linewidth=1)
-plt.xlabel('Assets $b$')
-plt.legend()
-plt.title('Drift (continuous-time)')
-destin = '../../main/figures/CT_change_assets.eps'
-plt.savefig(destin, format='eps', dpi=1000)
-#plt.show()()
-plt.close()
-
-"""
+plt.show()

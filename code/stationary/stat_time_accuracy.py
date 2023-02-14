@@ -49,7 +49,6 @@ import matplotlib.pyplot as plt
 if not os.path.exists('../../main/output'):
     os.makedirs('../../main/output')
 from true_stat import true_stat_load
-#from stat_accuracy_EGM import true_DT_stat, accuracy_tables_EGM
 
 c1, c2 = parameters.c1, parameters.c2
 colorFader = parameters.colorFader
@@ -60,7 +59,10 @@ tol, maxiter, maxiter_PFI = parameters.tol, parameters.maxiter, parameters.maxit
 bnd, bnd_NS = parameters.bnd, parameters.bnd_NS
 
 show_iter, show_method, show_final = 1, 1, 1
-N_true, N_c = parameters.N_true, parameters.N_c
+N_true = parameters.N_true
+NA = parameters.NA
+N_t = parameters.N_t
+N_c = parameters.N_c
 n_round_acc = parameters.n_round_acc
 n_round_time = parameters.n_round_time
 CT_dt_true = parameters.CT_dt_true
@@ -91,7 +93,7 @@ def accuracy_data(true_val,N_set,DT_dt,CT_dt,framework='both',method='BF',prob='
         print("Number of gridpoints:", N)
         d_DT, d_CT, d_compare = {}, {}, {}
         X[N] = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
-        N=N,N_c=N_c,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
+        N=N,NA=NA,N_t=N_t,N_c=N_c,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
         show_method=show_method,show_iter=show_iter,show_final=show_final,dt=DT_dt)
         Y[N] = classes.CT_stat_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
         N=N,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
@@ -212,7 +214,7 @@ def time_data(N_set,DT_dt,CT_dt,runs,framework='DT',prob='KD',run_VFI=True):
                 iter_data.append(d_iter)
         df = df + pd.DataFrame(data=time_data,index=N_set,columns=cols_time)
         df_iter = df_iter + pd.DataFrame(data=iter_data,index=N_set,columns=cols_time)
-    return df.round(decimals=n_round_time)/runs, df_iter
+    return df.round(decimals=n_round_time)/runs, df_iter/runs
 
 #only EGM in the following so no need for method
 def time_tables(true_val,N_set,DT_dt,CT_dt,runs,framework='DT',prob='KD'):
@@ -246,7 +248,7 @@ def time_accuracy_data(true_val,N_set,DT_dt,CT_dt,runs,prob='KD'):
     df_DT, df_DT_iter = time_data(N_set,DT_dt,CT_dt,runs,framework='DT',prob=prob,run_VFI=False)
     df_CT, df_CT_iter = time_data(N_set,DT_dt,CT_dt,runs,framework='CT',prob=prob,run_VFI=False)
     df_DT = df_DT.fillna(np.inf)
-    df_CT = df_CT.fillna(np.inf)
+    df_CT = df_CT.fillna(np.inf)]
 
     for i in range(len(N_set)):
         DT['accuracy'].append(df_acc_DT.iloc[i,0])
@@ -275,7 +277,7 @@ def time_accuracy_figures(true_val,N_set,DT_dt,CT_dt,runs,prob='KD'):
 Create tables
 """
 
-runs=10
+runs=5
 DT_dt=10**0
 prob='KD'
 true_val = true_stat_load(DT_dt, CT_dt_true, prob)
@@ -316,8 +318,8 @@ for prob in ['KD','Tauchen']:
     time_accuracy_figures(true_val, N_set_big, DT_dt, CT_dt_big, runs, prob=prob)
 
 accuracy_tables(true_val, N_set, DT_dt, CT_dt_true, 'DT', 'EGM', 'Tauchen')
-time_tables(true_val, N_set, DT_dt, CT_dt_big, runs, 'DT', 'Tauchen')
-time_tables(true_val, N_set, DT_dt, CT_dt_big, runs, 'CT', 'Tauchen')
+#time_tables(true_val, N_set, DT_dt, CT_dt_big, runs, 'DT', 'Tauchen')
+#time_tables(true_val, N_set, DT_dt, CT_dt_big, runs, 'CT', 'Tauchen')
 
 #runs = 10
 #true_val = true_stat_load(DT_dt, CT_dt_true, prob='Tauchen')
