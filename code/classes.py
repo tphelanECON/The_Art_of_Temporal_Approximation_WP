@@ -31,12 +31,18 @@ Some miscellaneous notes:
     generality is necessary in the nonstationary problem, where "slices" arise.
     * The DT_IFP class constructor allows for both the same probability
     transitions in the continuous-time case, denoted prob='KD' for "Kushner and
-    Dupuis", and also the method of Tauchen (1986).
+    Dupuis", and also the method of Tauchen (1986), denoted prob='Tauchen'.
     * All class constructors write self.cmax = self.kappac*self.c0, a vector
-    that is a multiple of zero net saving. This default is 2.
+    that is a multiple of zero net saving. This default is 2 for the stationary
+    problem, which never binds at the optimum.
+
+https://stackoverflow.com/questions/41769100/how-do-i-use-numba-on-a-member-function-of-a-class
+
+Careful about N[2] and NA conventions.
 """
 
 import numpy as np
+from numba import jit
 import scipy.sparse as sp
 from scipy.stats import norm
 from scipy.sparse import linalg
@@ -47,33 +53,38 @@ import itertools, time
 class DT_IFP(object):
     def __init__(self, rho=0.05, r=0.02, gamma=2, ybar=1, mubar=-np.log(0.95),
     sigma=np.sqrt(-2*np.log(0.95))*0.2, bnd=[[0,60],[-0.8,0.8]], N=[100,10],
-    NA=60, N_c=2000, dt=0.01, tol=10**-6, maxiter=400, maxiter_PFI=25,
+    NA=60, N_t=10, N_c=4000, dt=1, tol=10**-6, maxiter=400, maxiter_PFI=25,
     show_method=1, show_iter=1, show_final=1, kappac=2):
         self.rho, self.r, self.gamma = rho, r, gamma
         self.ybar, self.mubar, self.sigma = ybar, mubar, sigma
+        self.N_t = N_t
         self.N, self.bnd, self.NA = N, bnd, NA
         self.tol, self.maxiter, self.maxiter_PFI = tol, maxiter, maxiter_PFI
         self.bnd, self.Delta = bnd, [(bnd[i][1]-bnd[i][0])/self.N[i] for i in range(2)]
         self.grid = [np.linspace(self.bnd[i][0]+self.Delta[i],self.bnd[i][1]-self.Delta[i],self.N[i]-1) for i in range(2)]
         self.xx = np.meshgrid(self.grid[0],self.grid[1],indexing='ij')
         self.ii, self.jj = np.meshgrid(range(self.N[0]-1),range(self.N[1]-1),indexing='ij')
-        self.sigsig = self.sigma*(self.jj > 0)*(self.jj < self.N[1] - 2)
+        self.sigsig = self.sigma*(self.jj > 0)*(self.jj < self.N[1] - 2) #vanish on boundaries
         self.dt, self.Dt = dt, dt + 0*self.xx[0]
         self.grid_A = np.linspace(0+self.dt,self.dt*(self.NA-1),self.NA-1)
         self.N_c, self.M = N_c, (self.N[0]-1)*(self.N[1]-1)
         #following is "zero net saving" and value of this policy
         self.c0 = self.r*self.xx[0]/(1+self.dt*self.r) + self.ybar*np.exp(self.xx[1])
-        self.dt, self.Dt = dt, dt + 0*self.c0
+        self.dt_small = self.dt/self.N_t
         self.kappac = kappac
         self.cmax = self.kappac*self.c0
-        #self.V0, self.V0_T = self.V(self.c0), self.V(self.c0,'Tauchen')
-        self.V0 = self.V(self.c0)
-        self.pup = self.dt*(self.sigsig**2/2 + self.Delta[1]*np.maximum(self.mubar*(-self.grid[1]),0))/self.Delta[1]**2
-        self.pdown = self.dt*(self.sigsig**2/2 + self.Delta[1]*np.maximum(self.mubar*(self.grid[1]),0))/self.Delta[1]**2
-        self.pstay = 1 - self.pup - self.pdown
-        self.prob_check = np.min(self.pstay)
         self.show_method, self.show_iter, self.show_final = show_method, show_iter, show_final
         self.iter_keys = list(itertools.product(range(self.N[0]-1), range(self.N[1]-1)))
+        self.probs, self.p_z = {}, {}
+        self.p_z['KD'] = self.KD()
+        self.p_z['Tauchen'] = self.Tauchen()
+        self.check = np.min(self.p_z['KD']) > -10**-8
+        for disc in ['KD','Tauchen']:
+            self.probs[disc] = self.p_func((self.ii, self.jj), prob=disc)
+        self.V0 = self.V(self.c0)
+        self.clow = (self.grid[0][self.ii] - self.grid[0][-1]/(1+self.dt*self.r))/self.dt + self.ybar*np.exp(self.grid[1][self.jj]) + 10**-4
+        self.chigh = (self.grid[0][self.ii] - self.grid[0][0]/(1+self.dt*self.r))/self.dt + self.ybar*np.exp(self.grid[1][self.jj]) - 10**-4
+        self.first_Vp = self.Vp_cont_jit(self.V0,'KD')
 
     def u(self,c):
         if self.gamma==1:
@@ -87,153 +98,136 @@ class DT_IFP(object):
     def p_func(self,ind,prob='KD'):
         ii,jj = ind
         p_func = {}
-        x = (self.xx[0][ii,jj],self.xx[1][ii,jj])
-        sig = self.sigsig[ii,jj]
-        if prob=='KD':
-            p_func[1] = self.dt*(sig**2/2 + self.Delta[1]*np.maximum(self.mubar*(-x[1]),0))/self.Delta[1]**2
-            p_func[-1] = self.dt*(sig**2/2 + self.Delta[1]*np.maximum(-self.mubar*(-x[1]),0))/self.Delta[1]**2
-            p_func[0] = 1 - p_func[-1] - p_func[1]
-            return p_func
-        else:
-            P = self.Tauchen()
-            for k in range(self.N[1]-1):
-                p_func[k] = P[ii,jj,k]
-            return p_func
+        P = self.p_z[prob]
+        for k in range(self.N[1]-1):
+            p_func[k] = P[ii,jj,k]
+        return p_func
 
     def Tauchen(self):
         p = np.zeros((self.N[0]-1,self.N[1]-1,self.N[1]-1))
         iii, jjj, kkk = np.meshgrid(range(self.N[0]-1),range(self.N[1]-1),range(1,self.N[1]-2),indexing='ij')
-        up_bnd = (self.grid[1][kkk] + self.Delta[1]/2 - (1 - self.dt*self.mubar)*self.grid[1][jjj])/(self.dt*self.sigma)
-        down_bnd = (self.grid[1][kkk] - self.Delta[1]/2 - (1 - self.dt*self.mubar)*self.grid[1][jjj])/(self.dt*self.sigma)
+        up_bnd = (self.grid[1][kkk] + self.Delta[1]/2 - (1 - self.dt*self.mubar)*self.grid[1][jjj])/(np.sqrt(self.dt)*self.sigma)
+        down_bnd = (self.grid[1][kkk] - self.Delta[1]/2 - (1 - self.dt*self.mubar)*self.grid[1][jjj])/(np.sqrt(self.dt)*self.sigma)
         p[iii,jjj,kkk] = norm.cdf(up_bnd) - norm.cdf(down_bnd)
         iii, jjj, kkk = np.meshgrid(range(self.N[0]-1),range(self.N[1]-1),0,indexing='ij')
-        up_bnd = (self.grid[1][kkk] + self.Delta[1]/2 - (1 - self.dt*self.mubar)*self.grid[1][jjj])/(self.dt*self.sigma)
+        up_bnd = (self.grid[1][kkk] + self.Delta[1]/2 - (1 - self.dt*self.mubar)*self.grid[1][jjj])/(np.sqrt(self.dt)*self.sigma)
         p[iii,jjj,kkk] = norm.cdf(up_bnd)
         iii, jjj, kkk = np.meshgrid(range(self.N[0]-1),range(self.N[1]-1),self.N[1]-2,indexing='ij')
-        down_bnd = (self.grid[1][kkk] - self.Delta[1]/2 - (1 - self.dt*self.mubar)*self.grid[1][jjj])/(self.dt*self.sigma)
+        down_bnd = (self.grid[1][kkk] - self.Delta[1]/2 - (1 - self.dt*self.mubar)*self.grid[1][jjj])/(np.sqrt(self.dt)*self.sigma)
         p[iii,jjj,kkk] = 1 - norm.cdf(down_bnd)
         return p
 
+    #this seems fine.
+    def KD_z(self):
+        p_z_small = np.zeros((self.N[1]-1,self.N[1]-1))
+        sig = self.sigma + 0*self.grid[1]
+        sig[0], sig[-1] = 0, 0
+        pup_z_small = self.dt_small*(sig**2/2 + self.Delta[1]*np.maximum(self.mubar*(-self.grid[1]),0))/self.Delta[1]**2
+        pdown_z_small = self.dt_small*(sig**2/2 + self.Delta[1]*np.maximum(self.mubar*(self.grid[1]),0))/self.Delta[1]**2
+        p_z_small[range(self.N[1]-1),range(self.N[1]-1)] = 1 - pup_z_small - pdown_z_small
+        p_z_small[range(self.N[1]-2),range(1,self.N[1]-1)] = pup_z_small[:-1]
+        p_z_small[range(1,self.N[1]-1),range(self.N[1]-2)] = pdown_z_small[1:]
+        p_z_T = np.linalg.matrix_power(np.mat(p_z_small).T,self.N_t)
+        return np.array(p_z_T.T)
+
+    #this seems fine.
     def KD(self):
         p = np.zeros((self.N[0]-1,self.N[1]-1,self.N[1]-1))
-        pup, pdown, pstay = self.pup, self.pdown, 1 - self.pup - self.pdown
+        p_z = self.KD_z()
         iii, jjj, kkk = np.meshgrid(range(self.N[0]-1),range(self.N[1]-1),range(self.N[1]-1),indexing='ij')
-        p[iii,jjj,jjj] = pstay[jjj,jjj]
-        iii, jjj, kkk = np.meshgrid(range(self.N[0]-1),range(self.N[1]-2),range(self.N[1]-1),indexing='ij')
-        p[iii,jjj,jjj+1] = pup[jjj,jjj]
-        iii, jjj, kkk = np.meshgrid(range(self.N[0]-1),range(1,self.N[1]-1),range(self.N[1]-1),indexing='ij')
-        p[iii,jjj,jjj-1] = pdown[jjj,jjj]
+        p[iii,jjj,kkk] = p_z[jjj,kkk]
         return p
 
+    #reshape goes l-to-r then down. careful to not recompute too many things here.
     def P(self,c,prob='KD'):
         P = sp.coo_matrix((self.M,self.M))
         b_prime = (1 + self.dt*self.r)*(self.xx[0] + self.dt*(self.ybar*np.exp(self.xx[1]) - c))
         alpha, ind = self.weights_indices(b_prime)
         ii, jj = self.ii, self.jj
-        if prob=='KD':
-            for key in [-1,0,1]:
-                #lower then upper weights on asset transition:
-                row, col = ii*(self.N[1]-1) + jj, ind[ii,jj]*(self.N[1]-1) + jj + key
-                P = P + self.P_func(row,col,alpha[ii,jj]*self.p_func((ii,jj),prob)[key])
-                P = P + self.P_func(row,col+(self.N[1]-1),(1-alpha[ii,jj])*self.p_func((ii,jj),prob)[key])
-            return P
-        else:
-            for key in range(self.N[1]-1):
-                #lower then upper weights on asset transition:
-                row, col = ii*(self.N[1]-1) + jj, ind[ii,jj]*(self.N[1]-1) + key
-                P = P + self.P_func(row,col,alpha[ii,jj]*self.p_func((ii,jj),prob)[key])
-                P = P + self.P_func(row,col+(self.N[1]-1),(1-alpha[ii,jj])*self.p_func((ii,jj),prob)[key])
-            return P
+        check = np.sum(np.array([self.probs[prob][key] for key in range(self.N[1]-1)]))
+        for key in range(self.N[1]-1):
+            #lower then upper weights on asset transition:
+            row, col = ii*(self.N[1]-1) + jj, ind[ii,jj]*(self.N[1]-1) + key
+            P = P + self.P_func(row,col,alpha[ii,jj]*self.probs[prob][key])
+            P = P + self.P_func(row,col+(self.N[1]-1),(1-alpha[ii,jj])*self.probs[prob][key])
+        return P
 
     def polupdate(self,method,V,prob,stat=1):
+        cnew = np.zeros((self.N[0]-1,self.N[1]-1))
         if method=='BF':
             V_cont = np.zeros((self.N[0]-1,self.N[1]-1,self.N_c))
             ii_, jj_, kk_ = np.meshgrid(range(self.N[0]-1),range(self.N[1]-1),range(self.N_c),indexing='ij')
-            clow = (self.grid[0][self.ii] - self.grid[0][-1]/(1+self.dt*self.r))/self.dt + self.ybar*np.exp(self.grid[1][self.jj]) + 10**-4
-            chigh = (self.grid[0][self.ii] - self.grid[0][0]/(1+self.dt*self.r))/self.dt + self.ybar*np.exp(self.grid[1][self.jj]) - 10**-4
-            cgrid_rest = np.linspace(np.maximum(clow,10**-8), np.minimum(chigh, np.max(self.cmax)), self.N_c)
+            if stat==1:
+                cgrid_rest = np.linspace(np.maximum(self.clow,10**-8), np.minimum(self.chigh, np.max(self.cmax)), self.N_c)
+            else:
+                cgrid_rest = np.linspace(np.maximum(self.clow,10**-8), np.minimum(self.chigh, 10*np.max(self.cmax)), self.N_c)
             cgrid_rest = np.transpose(cgrid_rest, axes=[1, 2, 0])
             b_prime = (1 + self.dt*self.r)*(self.grid[0][ii_] + self.dt*(self.ybar*np.exp(self.grid[1][jj_]) - cgrid_rest))
             V_interp = [interp1d(self.grid[0], V[:,k])(b_prime) for k in range(self.N[1]-1)]
-            if prob=='KD':
-                p_z = self.KD()
-            else:
-                p_z = self.Tauchen()
             for k in range(self.N[1]-1):
-                V_cont = V_cont + p_z[ii_,jj_,k]*V_interp[k]
+                V_cont = V_cont + self.p_z[prob][ii_,jj_,k]*V_interp[k]
             RHS = self.dt*self.u(cgrid_rest) + np.exp(-self.rho*self.dt)*V_cont
             cnew = np.array([cgrid_rest[key[0],key[1],np.argmin(-RHS[key[0],key[1],:])] for key in self.iter_keys])
             cnew = cnew.reshape((self.N[0]-1,self.N[1]-1))
         else:
-            c_new = np.zeros((self.N[0]-1,self.N[1]-1))
-            cand_b = np.zeros((self.N[0]-1,self.N[1]-1))
-            cand_c = np.zeros((self.N[0]-1,self.N[1]-1))
-            Vp_cont = self.Vp_cont(V,prob)
-            #candidate asset values and consumption
-            cand_b[self.ii,self.jj] = self.dt*self.u_prime_inv((1+self.dt*self.r) \
-            *np.exp(-self.rho*self.dt)*Vp_cont[self.ii,self.jj]) \
-            + self.grid[0][self.ii]/(1+self.dt*self.r) - self.dt*self.ybar*np.exp(self.grid[1][self.jj])
-            cand_c[self.ii,self.jj] = (cand_b[self.ii,self.jj] \
-            - self.grid[0][self.ii]/(1+self.dt*self.r))/self.dt + self.ybar*np.exp(self.grid[1][self.jj])
+            bb, zz = self.grid[0][self.ii], self.grid[1][self.jj]
+            cand_b = self.dt*self.u_prime_inv((1+self.dt*self.r)*np.exp(-self.rho*self.dt) \
+            *self.Vp_cont_jit(V,prob)) + bb/(1+self.dt*self.r) - self.dt*self.ybar*np.exp(zz)
+            cand_c = (cand_b - bb/(1+self.dt*self.r))/self.dt + self.ybar*np.exp(zz)
             for j in range(self.N[1]-1):
-                c_new[:,j] = interp1d(cand_b[:,j], cand_c[:,j], fill_value="extrapolate")(self.grid[0])
-            return self.feasible_c(c_new)
+                cnew[:,j] = interp1d(cand_b[:,j], cand_c[:,j], fill_value="extrapolate")(self.grid[0])
+            cnew = np.minimum(np.maximum(cnew, self.clow), self.chigh)
         return cnew
 
-    def Vp_cont(self,V,prob):
-        Vp_cont, Vp = np.zeros((self.N[0]-1,self.N[1]-1)), np.zeros((self.N[0]-1,self.N[1]-1))
-        Vp[1:-1,:] = (V[2:,:] - V[:-2,:])/(2*self.Delta[0])
-        Vp[0,:], Vp[-1,:] = Vp[1,:], Vp[-2,:]
-        if prob=='KD':
-            pup, pdown, pstay = self.pup, self.pdown, 1 - self.pup - self.pdown
-            #Vp for interior z, z=z_low, and z=z_high, respectively:
-            ii_int, jj_int = np.meshgrid(range(self.N[0]-1),range(1,self.N[1]-2),indexing='ij')
-            Vp_cont[ii_int, jj_int] = pdown[ii_int,jj_int]*Vp[ii_int,jj_int-1] \
-            + pup[ii_int,jj_int]*Vp[ii_int,jj_int+1] + pstay[ii_int,jj_int]*Vp[ii_int,jj_int]
-            ii_low, jj_low = np.meshgrid(range(self.N[0]-1),0,indexing='ij')
-            Vp_cont[ii_low, jj_low] = pup[ii_low,jj_low]*Vp[ii_low,jj_low+1] \
-            + pstay[ii_low,jj_low]*Vp[ii_low,jj_low]
-            ii_high, jj_high = np.meshgrid(range(self.N[0]-1),self.N[1]-2,indexing='ij')
-            Vp_cont[ii_high, jj_high] = pdown[ii_high,jj_high]*Vp[ii_high,jj_high-1] \
-            + pstay[ii_high,jj_high]*Vp[ii_high,jj_high]
-            #replace negative values with small positive number
-            Vp_cont[Vp_cont[self.ii,self.jj] <= 10**-3] = 10**-3
-        else:
-            Vp_cont = self.Vp_cont_Tauchen(V)
+    #rapid construction of continuation values for V' (cannot call self. attributes)
+    @staticmethod
+    @jit(nopython=True)
+    def Vp_p_jit(Vp,p,N):
+        Vp_cont = np.zeros((N[0]-1,N[1]-1))
+        #k loops over future income, i over assets, and j over current income
+        for k in range(N[1]-1):
+            for i in range(N[0]-1):
+                for j in range(N[1]-1):
+                    Vp_cont[i,j] += p[i,j,k]*Vp[i,k]
         return Vp_cont
 
-    def Vp_cont_Tauchen(self,V):
-        p_z = self.Tauchen()
-        Vp_cont, Vp = np.zeros((self.N[0]-1,self.N[1]-1)), np.zeros((self.N[0]-1,self.N[1]-1))
+    def Vp_cont_jit(self,V,prob):
+        Vp = np.zeros((self.N[0]-1,self.N[1]-1))
         Vp[1:-1,:] = (V[2:,:] - V[:-2,:])/(2*self.Delta[0])
         Vp[0,:], Vp[-1,:] = Vp[1,:], Vp[-2,:]
-        for k in range(self.N[1]-1):
-            Vp_cont = Vp_cont + p_z[self.ii,self.jj,k]*Vp[self.ii,k]
-        return Vp_cont
-
-    def feasible_c(self,c):
-        ii, jj = np.meshgrid(range(self.N[0] - 1), range(self.N[1] - 1), indexing='ij')
-        clow = (self.grid[0][ii] - self.grid[0][-1]/(1+self.dt*self.r))/self.dt + self.ybar*np.exp(self.grid[1][jj]) + 10**-4
-        chigh = (self.grid[0][ii] - self.grid[0][0]/(1+self.dt*self.r))/self.dt + self.ybar*np.exp(self.grid[1][jj]) - 10**-4
-        return np.minimum(np.maximum(c, clow), chigh)
+        return self.Vp_p_jit(Vp,self.p_z[prob],self.N)
 
     def weights_indices(self,b_prime):
-        #following argument has 10**-8 term because I was concerned about overflow.
-        #be sure to subtract both the boundary point from the argument (to write
-        #b as a multiple of Delta_a) and subtract 1.
+        #10**-8 term in following due to rounding concern. subtract boundary
+        #point from argument (to write b as multiple of Delta_a) and subtract 1.
         ind = np.array([np.floor((b-self.bnd[0][0])/self.Delta[0] + 10**-8)-1 for b in b_prime]).astype(int)
-        lower = np.array([self.grid[0][0]+i*self.Delta[0] for i in ind])
-        return 1 - (b_prime - lower)/self.Delta[0], ind
+        return 1 - (b_prime - (self.grid[0][0]+ind*self.Delta[0]))/self.Delta[0], ind
 
     def V(self,c,prob='KD'):
         B = np.exp(-self.rho*self.dt)*self.P(c,prob) - sp.eye(self.M)
         return sp.linalg.spsolve(-B, self.dt*self.u(c).reshape((self.M,))).reshape((self.N[0]-1,self.N[1]-1))
 
     def MPFI(self,c,V,M,prob):
-        u, P, V = self.dt*self.u(c).reshape((self.M,)), self.P(c,prob), V.reshape((self.M,))
+        flow, P, V = self.dt*self.u(c).reshape((self.M,)), self.P(c,prob), V.reshape((self.M,))
         for i in range(M+1):
-            V = u + np.exp(-self.rho*self.dt)*(P*V)
+            V = flow + np.exp(-self.rho*self.dt)*(P*V)
         return V.reshape((self.N[0]-1,self.N[1]-1))
+
+    #often faster to NOT build matrix and instead write out relevant algebra
+    def Jacobi_no_matrix(self,c,V,prob):
+        PV = np.zeros((self.N[0]-1,self.N[1]-1))
+        b_prime = (1 + self.dt*self.r)*(self.xx[0] + self.dt*(self.ybar*np.exp(self.xx[1]) - c))
+        alpha, ind = self.weights_indices(b_prime)
+        ii, jj = self.ii, self.jj
+        for key in range(self.N[1]-1):
+            #lower then upper weights on asset transition:
+            row, col = ii*(self.N[1]-1) + jj, ind[ii,jj]*(self.N[1]-1) + jj + key
+            ind_bnd = (col>-1)*(col<self.M)
+            ii_, jj_ = ii[ind_bnd], jj[ind_bnd]
+            ind_ = ind[ii_,jj_]
+            alpha_, prob_ = alpha[ii_,jj_], self.probs[prob][key][ii_,jj_]
+            PV[ii_,jj_] = PV[ii_,jj_] + alpha_*prob_*V[ind_, key] + (1-alpha_)*prob_*V[ind_+1, key]
+        return self.dt*self.u(c) + np.exp(-self.rho*self.dt)*PV
 
     def solve_MPFI(self,method,M,V_init,prob='KD'):
         if self.show_method==1:
@@ -256,29 +250,38 @@ class DT_IFP(object):
             print("Time taken:", toc-tic)
         return V, c, toc-tic, i
 
-    def nonstat_solve(self,method,prob='KD'):
+    def nonstat_solve(self,method,prob='KD',matrix=False):
         if self.show_method==1:
             print("Starting non-stationary problem with {0} policy updates and {1} probabilities".format(method,prob))
         V = np.zeros((self.N[0]-1,self.N[1]-1,self.NA-1))
         c = np.zeros((self.N[0]-1,self.N[1]-1,self.NA-1))
+        time_array = np.zeros((2,self.NA-1))
         tic = time.time()
-        c[:,:,self.NA-2] = self.polupdate('BF',0*self.V(self.c0,prob),prob,0)
-        V[:,:,self.NA-2] = self.MPFI(c[:,:,self.NA-2],0*self.V(self.c0,prob),0,prob)
+        c[:,:,self.NA-2] = self.ybar*np.exp(self.xx[1]) + self.xx[0]/self.dt
+        V[:,:,self.NA-2] = self.MPFI(c[:,:,self.NA-2],np.zeros((self.N[0]-1,self.N[1]-1)),0,prob)
         toc = time.time()
         if self.show_method==1:
-            print("Initialize with brute force")
+            print("Initialize with known solution")
             print("Time taken:", toc-tic)
         tic = time.time()
-        for t in range(1,self.NA-1):
-            V_imp = V[:,:,self.NA-1-t]
-            if (int(self.NA-1-t) % 20 == 0) & (self.show_iter == 1):
-                print("Period:",self.NA-1-t)
-            c[:,:,self.NA-1-t-1] = self.polupdate(method,V_imp,prob,0)
-            V[:,:,self.NA-1-t-1] = self.MPFI(c[:,:,self.NA-1-t-1],V_imp,0,prob)
+        for k in range(self.NA-2):
+            if (int(self.NA-2-k-1) % 20 ==0):
+                print("Age:",self.NA-2-k-1)
+            V_imp = V[:,:,self.NA-2-k]
+            tc1 = time.time()
+            c[:,:,self.NA-2-k-1] = self.polupdate(method,V_imp,prob,0)
+            tc2 = time.time()
+            tV1 = time.time()
+            if matrix==True:
+                V[:,:,self.NA-2-k-1] = self.MPFI(c[:,:,self.NA-2-k-1],V_imp,0,prob)
+            else:
+                V[:,:,self.NA-2-k-1] = self.Jacobi_no_matrix(c[:,:,self.NA-2-k-1],V_imp,prob)
+            tV2 = time.time()
+            time_array[:,self.NA-2-k-1] = tc2-tc1, tV2-tV1
         toc = time.time()
         if self.show_final==1:
             print("Time taken:", toc-tic)
-        return V, c, toc-tic
+        return V, c, toc-tic, time_array
 
     def solve_PFI(self,method='BF',prob='KD'):
         if self.show_method==1:
@@ -305,6 +308,7 @@ class DT_IFP(object):
                 print("Time taken:", toc-tic)
             return V, c, toc-tic, i
 
+    #following used in the contruction of transition matrix P.
     def P_func(self,A,B,C):
         A,B,C = np.array(A), np.array(B), np.array(C)
         A,B,C = A[(B>-1)*(B<self.M)],B[(B>-1)*(B<self.M)],C[(B>-1)*(B<self.M)]
@@ -412,8 +416,6 @@ class CT_stat_IFP(object):
             V, i = V1, i+1
         toc = time.time()
         print("Difference in iterates for MPFI", M, ":", eps, "Iterations:", i)
-        if np.mean(self.P(self.polupdate(V)).sum(axis=1)) < 1:
-            print("Problem: mass missing in transition matrix")
         return V, self.polupdate(V), toc-tic, i
 
     def polupdate(self,V):
@@ -441,9 +443,6 @@ class CT_stat_IFP(object):
         return sp.coo_matrix((C.reshape(np.size(C),),(A.reshape(np.size(A),),B.reshape(np.size(B),))),shape=(self.M,self.M))
 
 """
-def mesh(self,m):
-    return np.meshgrid(range(max(-m[0],0),self.N[0] - 1 - max(m[0],0)), \
-    range(max(-m[1],0), self.N[1] - 1 - max(m[1],0)), indexing='ij')
 Non-stationary continuous-time income fluctuation problem
 """
 
@@ -467,7 +466,8 @@ class CT_nonstat_IFP(object):
         self.c0 = self.r*self.xx[0] + self.ybar*np.exp(self.xx[1])
         self.dt, self.Dt = dt, dt + 0*self.c0
         self.kappac = kappac
-        self.cmax = self.kappac*self.c0
+        #self.cmax = self.kappac*self.c0
+        self.cmax = 1.5*self.xx[0][-1] + 0*self.c0
         self.show_method, self.show_iter, self.show_final = show_method, show_iter, show_final
 
     def p_func(self,ind,c):
@@ -486,12 +486,17 @@ class CT_nonstat_IFP(object):
 
     def P(self,c):
         ii, jj, kk = self.ii, self.jj, self.kk
-        row = ii*((self.N[1]-1)*(self.N[2]-1)) + jj*(self.N[2]-1) + kk
+        row = ii*(self.N[1]-1)*(self.N[2]-1) + jj*(self.N[2]-1) + kk
         diag = 1 - sum(self.p_func((ii,jj,kk),c).values())
         P = self.P_func(row,row,diag)
-        for key in self.trans_keys:
+        for key in [(1,0,0),(-1,0,0),(0,1,0),(0,-1,0)]:
             column = row + key[0]*(self.N[1]-1)*(self.N[2]-1) + key[1]*(self.N[2]-1) + key[2]
             P = P + self.P_func(row,column,self.p_func((ii,jj,kk),c)[key])
+        #treat aging step separately. Do not want probabilities to "wrap around"
+        key = (0,0,1)
+        int_kk = self.kk<self.N[2]-2
+        column = row + key[0]*(self.N[1]-1)*(self.N[2]-1) + key[1]*(self.N[2]-1) + key[2]
+        P = P + self.P_func(row[int_kk],column[int_kk],self.p_func((ii,jj,kk),c)[key][int_kk])
         return P
 
     #in the following, both sides of the system are divided through by dt.
@@ -537,8 +542,6 @@ class CT_nonstat_IFP(object):
         toc = time.time()
         if self.show_final==1:
             print("Time taken:", toc-tic)
-        if np.max(self.polupdate(V) < self.cmax) == False:
-            print("PROBLEM: consumption inequality doesn't hold!")
         c = self.polupdate(V)
         return V, c, toc-tic, i
 
@@ -608,24 +611,27 @@ class CT_nonstat_IFP(object):
     def solve_seq_imp(self):
         if self.show_method==1:
             print("Starting sequential PFI")
-        V = 0*np.ones((self.N[0]-1,self.N[1]-1,self.N[2]-1))
-        c = 0*np.ones((self.N[0]-1,self.N[1]-1,self.N[2]-1))
-        tic = time.time()
+        V = np.zeros((self.N[0]-1,self.N[1]-1,self.N[2]-1))
+        c = np.zeros((self.N[0]-1,self.N[1]-1,self.N[2]-1))
+        time_array = np.zeros((2,self.N[2]-1))
         V_guess, c_guess = np.zeros((self.N[0]-1,self.N[1]-1)), self.c0[:,:,0]
         V[:,:,self.N[2]-2] = self.solveVslice(V_guess, c_guess)
         c[:,:,self.N[2]-2] = self.polupdate_slice(V[:,:,-1])
+        tic = time.time()
         for k in range(self.N[2]-2):
             if (int(self.N[2]-2-k-1) % 20 == 0) & (self.show_iter == 1):
                 print("Age:", self.N[2]-2-k-1)
+            tV1 = time.time()
             V[:,:,self.N[2]-2-k-1] = self.solveVslice(V[:,:,self.N[2]-2-k],c[:,:,self.N[2]-2-k])
-            c[:,:,self.N[2]-2-k-1] = self.polupdate_slice(V[:,:,self.N[2]-2-k])
+            tV2 = time.time()
+            tc1 = time.time()
+            c[:,:,self.N[2]-2-k-1] = self.polupdate_slice(V[:,:,self.N[2]-2-k-1])
+            tc2 = time.time()
+            time_array[:,self.N[2]-2-k-1] = tc2-tc1, tV2-tV1
         toc = time.time()
         if self.show_final==1:
             print("Time taken:", toc-tic)
-        if np.max(self.polupdate(V) < self.cmax) == False:
-            print("PROBLEM: consumption inequality doesn't hold!")
-        c = self.polupdate(V)
-        return V, c, toc-tic
+        return V, c, toc-tic, time_array
 
     def P_func_slice(self,A,B,C):
         A,B,C = np.array(A), np.array(B), np.array(C)
