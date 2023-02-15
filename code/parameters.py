@@ -1,11 +1,10 @@
 """
-Parameters common to all scripts.
+Parameters common to all scripts. Column names for tables also appear here.
 
-Column names for tables also appear here.
+The choices for rho, r, gamma, nu, mubar and sigma and the bounds on the asset
+and income gridscome from section F of the appendic to Achdou et al:
 
-The choices for rho, r, gamma, nu, mubar and sigma come from section F of
-https://benjaminmoll.com/wp-content/uploads/2019/07/HACT_appendix.pdf as do
-the bounds on the asset and income grids.
+    https://benjaminmoll.com/wp-content/uploads/2019/07/HACT_appendix.pdf
 
 Remaining choices somewhat arbitrary but inessential.
 """
@@ -26,11 +25,11 @@ bnd = [[0, 50], [-4*nu, 4*nu]]
 bnd_NS = [bnd[0], bnd[1], [0, max_age]]
 
 show_method, show_iter, show_final = 0, 0, 0
-N_true = (3000, 10)
+N_true = (4000, 10)
 N_set = [(50,10), (100,10), (250,10), (500,10), (1000,10)]
 relax_list = [10, 50, 100]
 
-N_c = 4000
+N_c = 5000
 n_round_acc = 4
 n_round_time = 2
 DT_dt = 10**0

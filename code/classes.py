@@ -35,10 +35,6 @@ Some miscellaneous notes:
     * All class constructors write self.cmax = self.kappac*self.c0, a vector
     that is a multiple of zero net saving. This default is 2 for the stationary
     problem, which never binds at the optimum.
-
-https://stackoverflow.com/questions/41769100/how-do-i-use-numba-on-a-member-function-of-a-class
-
-Careful about N[2] and NA conventions.
 """
 
 import numpy as np
@@ -57,8 +53,7 @@ class DT_IFP(object):
     show_method=1, show_iter=1, show_final=1, kappac=2):
         self.rho, self.r, self.gamma = rho, r, gamma
         self.ybar, self.mubar, self.sigma = ybar, mubar, sigma
-        self.N_t = N_t
-        self.N, self.bnd, self.NA = N, bnd, NA
+        self.N, self.bnd, self.NA, self.N_t = N, bnd, NA, N_t
         self.tol, self.maxiter, self.maxiter_PFI = tol, maxiter, maxiter_PFI
         self.bnd, self.Delta = bnd, [(bnd[i][1]-bnd[i][0])/self.N[i] for i in range(2)]
         self.grid = [np.linspace(self.bnd[i][0]+self.Delta[i],self.bnd[i][1]-self.Delta[i],self.N[i]-1) for i in range(2)]
@@ -117,7 +112,6 @@ class DT_IFP(object):
         p[iii,jjj,kkk] = 1 - norm.cdf(down_bnd)
         return p
 
-    #this seems fine.
     def KD_z(self):
         p_z_small = np.zeros((self.N[1]-1,self.N[1]-1))
         sig = self.sigma + 0*self.grid[1]
@@ -130,7 +124,6 @@ class DT_IFP(object):
         p_z_T = np.linalg.matrix_power(np.mat(p_z_small).T,self.N_t)
         return np.array(p_z_T.T)
 
-    #this seems fine.
     def KD(self):
         p = np.zeros((self.N[0]-1,self.N[1]-1,self.N[1]-1))
         p_z = self.KD_z()
@@ -144,7 +137,6 @@ class DT_IFP(object):
         b_prime = (1 + self.dt*self.r)*(self.xx[0] + self.dt*(self.ybar*np.exp(self.xx[1]) - c))
         alpha, ind = self.weights_indices(b_prime)
         ii, jj = self.ii, self.jj
-        check = np.sum(np.array([self.probs[prob][key] for key in range(self.N[1]-1)]))
         for key in range(self.N[1]-1):
             #lower then upper weights on asset transition:
             row, col = ii*(self.N[1]-1) + jj, ind[ii,jj]*(self.N[1]-1) + key
@@ -152,6 +144,7 @@ class DT_IFP(object):
             P = P + self.P_func(row,col+(self.N[1]-1),(1-alpha[ii,jj])*self.probs[prob][key])
         return P
 
+    #I think I want a different upper bound in the following.
     def polupdate(self,method,V,prob,stat=1):
         cnew = np.zeros((self.N[0]-1,self.N[1]-1))
         if method=='BF':
@@ -194,7 +187,8 @@ class DT_IFP(object):
     def Vp_cont_jit(self,V,prob):
         Vp = np.zeros((self.N[0]-1,self.N[1]-1))
         Vp[1:-1,:] = (V[2:,:] - V[:-2,:])/(2*self.Delta[0])
-        Vp[0,:], Vp[-1,:] = Vp[1,:], Vp[-2,:]
+        Vp[0,:] = (V[1,:] - V[0,:])/self.Delta[0]
+        Vp[-1,:] = (V[-1,:] - V[-2,:])/self.Delta[0]
         return self.Vp_p_jit(Vp,self.p_z[prob],self.N)
 
     def weights_indices(self,b_prime):
@@ -250,13 +244,14 @@ class DT_IFP(object):
             print("Time taken:", toc-tic)
         return V, c, toc-tic, i
 
-    def nonstat_solve(self,method,prob='KD',matrix=False):
+    def nonstat_solve(self,method,prob='KD',matrix=True):
         if self.show_method==1:
             print("Starting non-stationary problem with {0} policy updates and {1} probabilities".format(method,prob))
         V = np.zeros((self.N[0]-1,self.N[1]-1,self.NA-1))
         c = np.zeros((self.N[0]-1,self.N[1]-1,self.NA-1))
         time_array = np.zeros((2,self.NA-1))
         tic = time.time()
+        #there are NA-1 gridpoints, so NA-2 is the last point.
         c[:,:,self.NA-2] = self.ybar*np.exp(self.xx[1]) + self.xx[0]/self.dt
         V[:,:,self.NA-2] = self.MPFI(c[:,:,self.NA-2],np.zeros((self.N[0]-1,self.N[1]-1)),0,prob)
         toc = time.time()
@@ -267,15 +262,14 @@ class DT_IFP(object):
         for k in range(self.NA-2):
             if (int(self.NA-2-k-1) % 20 ==0):
                 print("Age:",self.NA-2-k-1)
-            V_imp = V[:,:,self.NA-2-k]
             tc1 = time.time()
-            c[:,:,self.NA-2-k-1] = self.polupdate(method,V_imp,prob,0)
+            c[:,:,self.NA-2-k-1] = self.polupdate(method,V[:,:,self.NA-2-k],prob,0)
             tc2 = time.time()
             tV1 = time.time()
             if matrix==True:
-                V[:,:,self.NA-2-k-1] = self.MPFI(c[:,:,self.NA-2-k-1],V_imp,0,prob)
+                V[:,:,self.NA-2-k-1] = self.MPFI(c[:,:,self.NA-2-k-1],V[:,:,self.NA-2-k],0,prob)
             else:
-                V[:,:,self.NA-2-k-1] = self.Jacobi_no_matrix(c[:,:,self.NA-2-k-1],V_imp,prob)
+                V[:,:,self.NA-2-k-1] = self.Jacobi_no_matrix(c[:,:,self.NA-2-k-1],V[:,:,self.NA-2-k],prob)
             tV2 = time.time()
             time_array[:,self.NA-2-k-1] = tc2-tc1, tV2-tV1
         toc = time.time()
