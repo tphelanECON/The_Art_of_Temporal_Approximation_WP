@@ -1,1 +1,3 @@
-This folder contains the output files (the "true" solutions). 
+This folder will contain the output files (the "true" solutions). 
+
+The output is too big for GitHub but if one runs true_stat.py and true_nonstat.py the true output will be placed here.
