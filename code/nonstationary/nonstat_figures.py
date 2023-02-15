@@ -1,5 +1,5 @@
 """
-Create figures for nonstationary problems (discrete and continuous time)
+Create figures for non-stationary problem without medical expenditures
 """
 
 import os, sys, inspect
@@ -8,14 +8,7 @@ parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir)
 
 import numpy as np
-import time, scipy, scipy.optimize
-import scipy.sparse as sp
-from scipy.sparse import diags
-from scipy.sparse import linalg
 import matplotlib.pyplot as plt
-from mpl_toolkits import mplot3d
-import matplotlib as mpl
-from scipy.interpolate import interp1d
 import classes, parameters
 
 c1,c2 = parameters.c1,parameters.c2
@@ -46,7 +39,7 @@ DT_dt = parameters.DT_dt
 N = (200,10)
 X = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
 N=N,NA=NA,N_t=N_t,N_c=N_c,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
-show_method=show_method,show_iter=show_iter,show_final=show_final,dt=1)
+show_method=show_method,show_iter=show_iter,show_final=show_final,dt=DT_dt)
 Z = classes.CT_nonstat_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,bnd=bnd_NS,
 N=(N[0],N[1],NA),maxiter=maxiter,tol=tol,show_method=show_method,
 show_iter=show_iter,show_final=show_final)
@@ -56,14 +49,10 @@ Define dictionaries (never run CT[('naive_PFI',i)] = Z.solve_PFI())
 """
 
 DT, CT, mean_time = {}, {}, {}
-pol_method_list = ['EGM']
-val_method_list = ['VFI','PFI']
-i=1
-
-DT[('VFI_EGM',i)] = X.nonstat_solve('EGM')
-V_DT, c_DT = DT[('VFI_EGM',i)][0:2]
-CT[('seq_PFI',i)] = Z.solve_seq_imp()
-V_imp, c_imp = CT[('seq_PFI',i)][0:2]
+DT['VFI_EGM'] = X.nonstat_solve('EGM')
+V_DT, c_DT = DT['VFI_EGM'][0:2]
+CT['seq_PFI'] = Z.solve_seq_imp()
+V_imp, c_imp = CT['seq_PFI'][0:2]
 
 print("Max absolute difference, EGM + VFI vs CT + implicit MCA:", np.max(np.abs(V_DT-V_imp)))
 print("Mean absolute difference, EGM + VFI vs CT + implicit MCA:", np.mean(np.abs(V_DT-V_imp)))

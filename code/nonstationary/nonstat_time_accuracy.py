@@ -75,7 +75,6 @@ cols_compare = parameters.cols_compare
 cols_time_nonstat = parameters.cols_time_nonstat
 cols_time_nonstat_decomp = parameters.cols_time_nonstat_decomp
 
-
 def accuracy_data(true_val,N_set,DT_dt,CT_dt,framework='both',method='EGM',prob='KD'):
     X, Z, DT, CT = {}, {}, {}, {}
     if framework in ['DT','both']:
@@ -212,7 +211,7 @@ def time_data(N_set,DT_dt,CT_dt,runs,prob='KD',run_PFI=True):
             d[cols_time_nonstat[1]] = sol_CT[2]
             d_decomp[cols_time_nonstat_decomp[2]] = sol_CT[3].sum(axis=1)[0]
             d_decomp[cols_time_nonstat_decomp[3]] = sol_CT[3].sum(axis=1)[1]
-            if (N[0] < 100) and (run_PFI==True):
+            if (N[0] < 200) and (run_PFI==True):
                 d[cols_time_nonstat[2]] = Z[N].solve_PFI()[2]
             else:
                 d[cols_time_nonstat[2]] = np.Inf
@@ -223,7 +222,7 @@ def time_data(N_set,DT_dt,CT_dt,runs,prob='KD',run_PFI=True):
     return df.round(decimals=n_round_time)/runs, df_decomp.round(decimals=n_round_time)/runs
 
 def time_tables(true_val,N_set,DT_dt,CT_dt,runs,prob='KD'):
-    data = time_data(N_set,DT_dt,CT_dt,runs,prob,run_PFI=False)
+    data = time_data(N_set,DT_dt,CT_dt,runs,prob,run_PFI=True)
     df, df_decomp = data
     df.index.names, df_decomp.index.names = ['Grid size'], ['Grid size']
 
@@ -276,6 +275,7 @@ CT_dt = CT_dt_true
 prob = 'KD'
 true_val = true_nonstat_load(DT_dt, CT_dt_true, parameters.NA, prob)
 N_set = parameters.N_set
+#N_set = [(50,10), (100,10), (250,10), (500,10), (1000,10)]
 accuracy_tables(true_val, N_set, DT_dt, CT_dt_true, 'both', 'BF', prob)
 """
 EGM accuracy
@@ -288,7 +288,7 @@ Time (and number of iterations) for convergence (need to reload original true)
 runs=10
 for prob in ['KD','Tauchen']:
     true_val = true_nonstat_load(DT_dt, CT_dt_true, parameters.NA, prob)
-    time_tables(true_val, N_set, DT_dt, CT_dt_true, runs, prob)
+    time_tables(true_val, parameters.N_set, DT_dt, CT_dt_true, runs, prob)
 
 """
 Speed versus accuracy (both KD and Tauchen)

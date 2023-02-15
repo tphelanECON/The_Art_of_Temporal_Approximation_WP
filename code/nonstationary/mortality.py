@@ -1,5 +1,5 @@
 """
-Class constructors for the mortality choice section of "The Art of Temporal Approximation".
+Class constructors for the mortality choice example from "The Art of Temporal Approximation".
 
 Author: Thomas Phelan.
 Email: tom.phelan@clev.frb.org.
@@ -9,15 +9,15 @@ This script contains two class constructors:
     1. DT_IFP_mortality: discrete-time IFP (stationary and age-dependent)
     2. CT_nonstat_IFP_mortality: continuous-time nonstationary (age-dependent) IFP
 
-Troubleshooting. Some probems that can arise:
+Some problems that can arise for certain parameters:
 
     * be careful that asset bounds are chosen s.t. agent wants to dissave at
     the upper bound. Otherwise we get a "spike" in consumption.
     * notice that FOCs might not characterize optimum EVEN IF value function is
     concave, because RHS of Bellman equation is not concave in c and m.
 
-This last observation is a point in favor of the continuous-time framework,
-because the continuous-time framework is unaffected by these subtleties.
+In the paper we emphasize that this last observation is a point in favor for the
+continuous-time framework, because it is unaffected by these problems.
 """
 
 import os, sys, inspect
@@ -153,15 +153,18 @@ class DT_IFP_mortality(object):
         return (1+self.dt*self.r)*(1-self.lam_func(m)*self.dt)*np.exp(-self.rho*self.dt)*Vp_cont
 
     #only EGM used. V_slice in the following is FUTURE V.
+    #previously things were MORE accurate when we didn't interpolate m???
     def polupdate(self,V_slice,prob):
         cnew = np.zeros((self.N[0]-1,self.N[1]-1))
-        mnew = self.m(V_slice,prob)
-        G = self.G(mnew,V_slice,prob)
+        mnew = np.zeros((self.N[0]-1,self.N[1]-1))
+        m = self.m(V_slice,prob)
+        G = self.G(m,V_slice,prob)
         bb, zz = self.grid[0][self.ii], self.grid[1][self.jj]
-        cand_b = self.dt*(self.u_prime_inv(G) + mnew - self.ybar*np.exp(zz)) + bb/(1+self.dt*self.r)
-        cand_c = (cand_b - bb/(1+self.dt*self.r))/self.dt + self.ybar*np.exp(zz) - mnew
+        cand_b = self.dt*(self.u_prime_inv(G) + m - self.ybar*np.exp(zz)) + bb/(1+self.dt*self.r)
+        cand_c = (cand_b - bb/(1+self.dt*self.r))/self.dt + self.ybar*np.exp(zz) - m
         for j in range(self.N[1]-1):
             cnew[:,j] = interp1d(cand_b[:,j], cand_c[:,j], fill_value="extrapolate")(self.grid[0])
+            mnew[:,j] = interp1d(cand_b[:,j], m[:,j], fill_value="extrapolate")(self.grid[0])
         cbound = self.cbound_func(mnew)
         return np.minimum(np.maximum(cnew, cbound[0]), cbound[1]), mnew
 
@@ -181,7 +184,8 @@ class DT_IFP_mortality(object):
     def Vp_cont_jit(self,V,prob):
         Vp = np.zeros((self.N[0]-1,self.N[1]-1))
         Vp[1:-1,:] = (V[2:,:] - V[:-2,:])/(2*self.Delta[0])
-        Vp[0,:], Vp[-1,:] = Vp[1,:], Vp[-2,:]
+        Vp[0,:] = (V[1,:] - V[0,:])/self.Delta[0]
+        Vp[-1,:] = (V[-1,:] - V[-2,:])/self.Delta[0]
         return self.V_p_jit(Vp,self.p_z[prob],self.N)
 
     def weights_indices(self,b_prime):
@@ -427,16 +431,18 @@ mubar, sigma = parameters.mubar, parameters.sigma
 tol, maxiter, maxiter_PFI = parameters.tol, parameters.maxiter, parameters.maxiter_PFI
 bnd, bnd_NS = parameters.bnd, parameters.bnd_NS
 
-N_true, N_c = parameters.N_true, parameters.N_c
+N_true = parameters.N_true
 show_iter, show_method, show_final = 1, 1, 1
-N_true, N_c = parameters.N_true, parameters.N_c
+NA = parameters.NA
+NA_true = parameters.NA_true
+N_t = parameters.N_t
+N_c = parameters.N_c
 n_round_acc = parameters.n_round_acc
 n_round_time = parameters.n_round_time
 CT_dt_true = parameters.CT_dt_true
 CT_dt_mid = parameters.CT_dt_mid
 CT_dt_big = parameters.CT_dt_big
 DT_dt = parameters.DT_dt
-NA = parameters.NA
 
 D=-20
 Lam1=10
@@ -445,10 +451,10 @@ mfix=0.2
 mbar=4.0
 
 N = (200,10)
-X = DT_IFP_mortality(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
-N=N,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
-show_method=show_method,show_iter=show_iter,show_final=show_final,dt=1,NA=NA,
-D=D,Lam1=Lam1,Lam0=Lam0,mfix=mfix,mbar=mbar)
+X = DT_IFP_mortality(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,N=N,NA=NA,
+N_t=N_t,N_c=N_c,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
+show_method=show_method,show_iter=show_iter,show_final=show_final,dt=DT_dt,D=D,
+Lam1=Lam1,Lam0=Lam0,mfix=mfix,mbar=mbar)
 W = CT_nonstat_IFP_mortality(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,bnd=bnd_NS,
 N=(N[0],N[1],NA),maxiter=maxiter,tol=tol,show_method=show_method,
 show_iter=show_iter,show_final=show_final,D=D,Lam1=Lam1,Lam0=Lam0,mfix=mfix,mbar=mbar)
