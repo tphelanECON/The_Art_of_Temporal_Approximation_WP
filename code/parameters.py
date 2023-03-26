@@ -2,40 +2,56 @@
 Parameters common to all scripts. Column names for tables also appear here.
 
 The choices for rho, r, gamma, nu, mubar and sigma and the bounds on the asset
-and income gridscome from section F of the appendic to Achdou et al:
+and income gridscome are from section F of the appendix to Achdou et al:
 
     https://benjaminmoll.com/wp-content/uploads/2019/07/HACT_appendix.pdf
 
-Remaining choices somewhat arbitrary but inessential.
 """
 
 import numpy as np
 import matplotlib as mpl
 
+"""
+Preferences and income parameters
+"""
 rho, r, gamma, nu = 1/0.95-1, 0.03, 2.0, 0.2
-mubar, sigma = -np.log(0.95), np.sqrt(-2*np.log(0.95))*nu
-maxiter, maxiter_PFI, tol = 20000, 25, 10**-8
+ybar, mubar, sigma = 1, -np.log(0.95), np.sqrt(-2*np.log(0.95))*nu
 
 max_age = 60
 NA = 60
 NA_scale = int(10)
 NA_true = int(NA_scale*NA)
-N_t = 10
-bnd = [[0, 50], [-4*nu, 4*nu]]
+ind_sd = 4
+bnd = [[0, 60], [-ind_sd*nu, ind_sd*nu]]
 bnd_NS = [bnd[0], bnd[1], [0, max_age]]
+Nexample = (100,10)
 
+maxiter, maxiter_PFI, tol = 20000, 25, 10**-8
 show_method, show_iter, show_final = 0, 0, 0
-N_true = (4000, 10)
-N_set = [(50,10), (100,10), (250,10), (500,10), (1000,10)]
-relax_list = [10, 50, 100]
 
+"""
+Grid parameters ("true" values and grids for tables and scatterplot)
+"""
+
+N_true = (3000, 10)
 N_c = 5000
-n_round_acc = 4
-n_round_time = 2
+N_set = [(50,10), (100,10), (250,10), (500,10), (1000,10)]
+N_grid = np.linspace(np.log(50), np.log(1000), 10)
+N_set_scatter = [(int(np.rint(np.exp(n))),10) for n in N_grid]
+
+relax_list = [10, 50, 100]
 DT_dt = 10**0
 CT_dt_true = 10**-6
 CT_dt_mid = 10**-3
 CT_dt_big = 2*10**-2
+N_t = int(1/CT_dt_true)
+
+"""
+Columns, plotting and rounding numbers
+"""
+
+n_round_acc = 4
+n_round_time = 2
 
 c1,c2='lightsteelblue','darkblue'
 def colorFader(c1,c2,mix):
