@@ -1,22 +1,21 @@
 """
-Create figures for the example policy and value functions in the stationary
-setting (discrete and continuous time).
+Figures for example policy and value functions in the stationary setting.
 
 Systematic exploration of run times and accuracy occurs elsewhere.
+
+This script solves both using PFI. Note that this HAPPENS to converge for
+this discrete-time problem but is not assured to do so.
 
 Relevant class constructors in classes.py:
     DT_IFP: discrete-time IFP (stationary and age-dependent)
     CT_stat_IFP: continuous-time stationary IFP
 
-The example plots will have the same grid parameters, and therefore do not need
-to be indexed by grid or timestep. They are just examples.
 """
 
 import os, sys, inspect
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir)
-
 import numpy as np
 import matplotlib.pyplot as plt
 import classes, parameters
@@ -33,38 +32,34 @@ mubar, sigma = parameters.mubar, parameters.sigma
 tol, maxiter, maxiter_PFI = parameters.tol, parameters.maxiter, parameters.maxiter_PFI
 bnd, bnd_NS = parameters.bnd, parameters.bnd_NS
 show_method, show_iter, show_final = parameters.show_method, parameters.show_iter, parameters.show_final
+ybar = parameters.ybar
 
-N, NA = (100,10), 60
+NA = 60
+N = parameters.Nexample
 DT_dt = parameters.DT_dt
 CT_dt = parameters.CT_dt_true
+N_t = parameters.N_t
 
-X = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,N=N,bnd=bnd,
-NA=NA,N_t=1,maxiter=maxiter,tol=tol,show_method=show_method,show_iter=show_iter,
-show_final=show_final,dt=DT_dt)
+X = classes.DT_IFP(rho=rho,r=r,gamma=gamma,ybar=ybar,mubar=mubar,sigma=sigma,
+N=N,bnd=bnd,NA=NA,maxiter=maxiter,tol=tol,show_method=show_method,
+show_iter=show_iter,show_final=show_final,dt=DT_dt)
 
-W = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,N=N,bnd=bnd,
-NA=NA,N_t=10,maxiter=maxiter,tol=tol,show_method=show_method,show_iter=show_iter,
-show_final=show_final,dt=DT_dt)
-
-sol = {}
-for class_instance in [X, W]:
-    sol[class_instance] = class_instance.solve_PFI('EGM',prob='KD')
-
-Y = classes.CT_stat_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,N=N,
-bnd=bnd,maxiter=maxiter,tol=tol,show_method=show_method,show_iter=show_iter,
+Y = classes.CT_stat_IFP(rho=rho,r=r,gamma=gamma,ybar=ybar,mubar=mubar,sigma=sigma,
+N=N,bnd=bnd,maxiter=maxiter,tol=tol,show_method=show_method,show_iter=show_iter,
 show_final=show_final,dt=CT_dt)
 
 """
 Define dictionaries for discrete-time and continuous-time problems.
 """
 
+prob = 'KD'
 DT, CT = {}, {}
 pol_method_list = ['EGM']
-val_method_list = ['VFI','PFI']
+val_method_list = ['PFI'] #'MPFI',
 print("Running discrete-time problems")
 for pol_method in pol_method_list:
-    DT[(pol_method,'VFI')] = X.solve_MPFI(pol_method,5,X.V0,prob='Tauchen')
-    DT[(pol_method,'PFI')] = X.solve_PFI(pol_method,prob='Tauchen')
+    #DT[(pol_method,'MPFI')] = X.solve_MPFI(pol_method,10,X.V0,prob=prob)
+    DT[(pol_method,'PFI')] = X.solve_PFI(pol_method,prob=prob)
 print("Running continuous-time problems")
 CT = Y.solve_PFI()
 
@@ -80,9 +75,9 @@ for pol_method in pol_method_list:
     for val_method in val_method_list:
         V,c = DT[(pol_method,val_method)][0:2]
         fig, ax = plt.subplots()
-        for j in range(N[1]-1):
-            color = colorFader(c1,c2,j/(N[1]-1))
-            if j in [0,N[1]-2]:
+        for j in range(N[1]+1):
+            color = colorFader(c1,c2,j/(N[1]+1))
+            if j in [0,N[1]]:
                 inc = X.ybar*np.round(np.exp(X.grid[1][j]),2)
                 ax.plot(X.grid[0], V[:,j], color=color, label="Income {0}".format(inc), linewidth=1)
             else:
@@ -94,9 +89,9 @@ for pol_method in pol_method_list:
         plt.savefig(destin, format='eps', dpi=1000)
         plt.show()
         fig, ax = plt.subplots()
-        for j in range(N[1]-1):
-            color = colorFader(c1,c2,j/(N[1]-1))
-            if j in [0,N[1]-2]:
+        for j in range(N[1]+1):
+            color = colorFader(c1,c2,j/(N[1]+1))
+            if j in [0,N[1]]:
                 inc = X.ybar*np.round(np.exp(X.grid[1][j]),2)
                 ax.plot(X.grid[0], c[:,j], color=color, label="Income {0}".format(inc), linewidth=1)
             else:
@@ -110,9 +105,9 @@ for pol_method in pol_method_list:
         plt.close()
 
 fig, ax = plt.subplots()
-for j in range(N[1]-1):
-    color = colorFader(c1,c2,j/(N[1]-1))
-    if j in [0,N[1]-2]:
+for j in range(N[1]+1):
+    color = colorFader(c1,c2,j/(N[1]+1))
+    if j in [0,N[1]]:
         inc = X.ybar*np.round(np.exp(X.grid[1][j]),2)
         ax.plot(X.grid[0], CT[0][:,j], color=color, label="Income {0}".format(inc), linewidth=1)
     else:
@@ -126,9 +121,9 @@ plt.show()
 plt.close()
 
 fig, ax = plt.subplots()
-for j in range(N[1]-1):
-    color = colorFader(c1,c2,j/(N[1]-1))
-    if j in [0,N[1]-2]:
+for j in range(N[1]+1):
+    color = colorFader(c1,c2,j/(N[1]+1))
+    if j in [0,N[1]]:
         inc = X.ybar*np.round(np.exp(X.grid[1][j]),2)
         ax.plot(X.grid[0], CT[1][:,j], color=color, label="Income {0}".format(inc), linewidth=1)
     else:
@@ -142,10 +137,10 @@ plt.show()
 plt.close()
 
 fig, ax = plt.subplots()
-for j in range(N[1]-1):
-    color = colorFader(c1,c2,j/(N[1]-1))
-    c, y = CT[1], np.exp(X.grid[1][:])
-    if j in [0,N[1]-2]:
+for j in range(N[1]+1):
+    color = colorFader(c1,c2,j/(N[1]+1))
+    c, y = CT[1], X.ybar*np.exp(X.grid[1][:])
+    if j in [0,N[1]]:
         inc = X.ybar*np.round(np.exp(X.grid[1][j]),2)
         ax.plot(X.grid[0], X.r*X.grid[0] + y[j] - c[:,j], color=color, label="Income {0}".format(inc), linewidth=1)
     else:
@@ -156,20 +151,16 @@ plt.title('Drift (continuous-time)')
 destin = '../../main/figures/CT_drift_optimal.eps'
 plt.savefig(destin, format='eps', dpi=1000)
 plt.show()
-#plt.close()
-
-"""
-Now plot the largest that Delta_t can be when evaluated at the optimum? No,
-"""
+plt.close()
 
 """
 Comparison between discrete and continuous-time
 """
 
 fig, ax = plt.subplots()
-for j in range(N[1]-1):
-    color = colorFader(c1,c2,j/(N[1]-1))
-    if j in [0,N[1]-2]:
+for j in range(N[1]+1):
+    color = colorFader(c1,c2,j/(N[1]+1))
+    if j in [0,N[1]]:
         inc = X.ybar*np.round(np.exp(X.grid[1][j]),2)
         ax.plot(X.grid[0], DT[('EGM','PFI')][0][:,j] - CT[0][:,j], color=color, label="Income {0}".format(inc), linewidth=1)
     else:
@@ -182,13 +173,13 @@ plt.savefig(destin, format='eps', dpi=1000)
 plt.show()
 
 fig, ax = plt.subplots()
-for j in range(N[1]-1):
-    color = colorFader(c1,c2,j/(N[1]-1))
-    if j in [0,N[1]-2]:
+for j in range(N[1]+1):
+    color = colorFader(c1,c2,j/(N[1]+1))
+    if j in [0,N[1]]:
         inc = X.ybar*np.round(np.exp(X.grid[1][j]),2)
-        ax.plot(X.grid[0], DT[('EGM','PFI')][1][:,j] - CT[1][:,j], color=color, label="Income {0}".format(inc), linewidth=1)
+        ax.plot(X.grid[0], dc[:,j], color=color, label="Income {0}".format(inc), linewidth=1)
     else:
-        ax.plot(X.grid[0], DT[('EGM','PFI')][1][:,j] - CT[1][:,j], color=color, linewidth=1)
+        ax.plot(X.grid[0], dc[:,j], color=color, linewidth=1)
 plt.xlabel('Assets $b$')
 plt.legend()
 plt.title('Policy function differences')
@@ -201,11 +192,11 @@ Now the difference in assets in the stationary environment
 """
 
 fig, ax = plt.subplots()
-for j in range(N[1]-1):
-    color = colorFader(c1,c2,j/(N[1]-1))
-    c, y = DT[(pol_method,'VFI')][1][:,j], np.exp(X.grid[1][:])
+for j in range(N[1]+1):
+    color = colorFader(c1,c2,j/(N[1]+1))
+    c, y = DT[(pol_method,'PFI')][1][:,j], X.ybar*np.exp(X.grid[1][:])
     d_assets = (1 + X.dt*X.r)*(X.grid[0] + y[j] - c) - X.grid[0]
-    if j in [0,N[1]-2]:
+    if j in [0,N[1]]:
         inc = X.ybar*np.round(np.exp(X.grid[1][j]),2)
         ax.plot(X.grid[0], d_assets, color=color, label="Income {0}".format(inc), linewidth=1)
     else:
