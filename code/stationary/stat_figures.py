@@ -10,6 +10,7 @@ Relevant class constructors in classes.py:
     DT_IFP: discrete-time IFP (stationary and age-dependent)
     CT_stat_IFP: continuous-time stationary IFP
 
+
 """
 
 import os, sys, inspect
@@ -32,6 +33,7 @@ mubar, sigma = parameters.mubar, parameters.sigma
 tol, maxiter, maxiter_PFI = parameters.tol, parameters.maxiter, parameters.maxiter_PFI
 bnd, bnd_NS = parameters.bnd, parameters.bnd_NS
 show_method, show_iter, show_final = parameters.show_method, parameters.show_iter, parameters.show_final
+show_method, show_iter, show_final = 1,1,1
 ybar = parameters.ybar
 
 NA = 60
@@ -56,12 +58,30 @@ prob = 'KD'
 DT, CT = {}, {}
 pol_method_list = ['EGM']
 val_method_list = ['PFI'] #'MPFI',
+print("Running continuous-time problems")
+CT = Y.solve_PFI()
+
 print("Running discrete-time problems")
 for pol_method in pol_method_list:
     #DT[(pol_method,'MPFI')] = X.solve_MPFI(pol_method,10,X.V0,prob=prob)
-    DT[(pol_method,'PFI')] = X.solve_PFI(pol_method,prob=prob)
-print("Running continuous-time problems")
-CT = Y.solve_PFI()
+    DT[(pol_method,'MPFI')] = X.solve_MPFI(pol_method,10,CT[0],prob=prob)
+    #DT[(pol_method,'PFI')] = X.solve_PFI(pol_method,prob=prob)
+
+t = {}
+Z = {}
+
+for N in [(1000,10), (2000,10), (3000,10), (4000,10), (5000,10)]:
+    print("Computing PFI for DT setting with N = {0}".format(N))
+    Z[N] = classes.DT_IFP(rho=rho,r=r,gamma=gamma,ybar=ybar,mubar=mubar,sigma=sigma,
+    N=N,bnd=bnd,NA=NA,maxiter=maxiter,tol=tol,show_method=show_method,
+    show_iter=show_iter,show_final=show_final,dt=DT_dt)
+    sol = Z[N].solve_MPFI(pol_method,0,Z[N].V0,prob=prob)
+    #sol = Z[N].solve_PFI(pol_method,prob=prob)
+    t[N] = sol[2]
+
+
+
+
 
 """
 Figures

@@ -34,6 +34,16 @@ Use parameters.N_set for the tables.
 Use parameters.N_set_scatter for the scatterplot.
 
 true_stat_load now requires dimensions.
+
+There does not seem to be an need to compute the "true" values for a small dt
+in the DT case. We only did this to compare across frameworks. The comparison
+between DT and CT does not require knowledge of the true values.
+
+Consider breaking this off? Yes. Doing this now. No longer called "accuracy".
+Now called comparison_data and comparison_tables. The comparison ones do not
+need a "true" quantity and so this should be much quicker.
+
+
 """
 
 import os, sys, inspect
@@ -58,7 +68,7 @@ mubar, sigma = parameters.mubar, parameters.sigma
 tol, maxiter, maxiter_PFI = parameters.tol, parameters.maxiter, parameters.maxiter_PFI
 bnd, bnd_NS = parameters.bnd, parameters.bnd_NS
 
-show_iter, show_method, show_final = 1, 1, 1
+show_iter, show_method, show_final = 0, 0, 0
 N_t = parameters.N_t
 N_c = parameters.N_c
 
@@ -70,20 +80,19 @@ cols_compare = parameters.cols_compare
 cols_time = parameters.cols_time
 
 """
-Compare with true values
+Compare with true values (accuracy_data no longer contains the comparisons across methods).
+Want to rewrite following in percentage deviations of policy function.
 """
 
-def accuracy_data(true_val,N_set,DT_dt,CT_dt,framework='both',method='BF',prob='KD'):
-    N_true = true_val['DT'][0].shape
+def accuracy_data(true_val,N_set,DT_dt,CT_dt,framework='both',method='EGM',prob='KD'):
+    N_true_shape = true_val['DT'][0].shape
     X, Y, DT, CT = {}, {}, {}, {}
     if framework in ['DT','both']:
         DT['True'] = true_val['DT']
-        DT_diff_true, data_DT = {}, []
+        data_DT = []
     if framework in ['CT','both']:
         CT['True'] = true_val['CT']
-        CT_diff_true, data_CT = {}, []
-    if framework=='both':
-        DT_CT, data_compare = {}, []
+        data_CT = []
     for N in N_set:
         print("Number of gridpoints:", N)
         d_DT, d_CT, d_compare = {}, {}, {}
@@ -93,53 +102,67 @@ def accuracy_data(true_val,N_set,DT_dt,CT_dt,framework='both',method='BF',prob='
         Y[N] = classes.CT_stat_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
         N=N,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
         show_method=show_method,show_iter=show_iter,show_final=show_final,dt=CT_dt)
-        fine_asset_grid = np.linspace(bnd[0][0],bnd[0][1],N_true[0]+1)
-        #f1 true values on fine gird. f2 on coarse grid; interpolated on fine grid.
+        fine_asset_grid = np.linspace(bnd[0][0],bnd[0][1],N_true_shape[0])
+        #f1 true values on fine grid. f2 on coarse grid; interpolated on fine grid.
         def compare(f1,f2):
-            f2_fine = np.zeros((N_true[0]+1,N_true[1]+1))
-            for j in range(N_true[1]+1):
+            f2_fine = np.zeros((N_true_shape[0],N_true_shape[1]))
+            for j in range(N_true_shape[1]):
                 f2_fine[:,j] = interp1d(X[N].grid[0], f2[:,j],fill_value="extrapolate")(fine_asset_grid)
             return f1-f2_fine
         #compute DT output and compare with truth
         if framework in ['DT','both']:
             DT[N] = X[N].solve_PFI(method,prob)
-            d = np.array(compare(DT['True'][0], DT[N][0])), np.array(compare(DT['True'][1], DT[N][1]))
-            #policy function then values functions:
-            d_DT[cols_true[0]] = np.mean(np.abs(d[1]))
-            d_DT[cols_true[1]] = np.max(np.abs(d[1]))
-            d_DT[cols_true[2]] = np.mean(np.abs(d[0]))
-            d_DT[cols_true[3]] = np.max(np.abs(d[0]))
+            d = np.array(compare(DT['True'][1], DT[N][1]))
+            d_percent = 100*d/DT['True'][1]
+            d_DT[cols_true[0]] = np.mean(np.abs(d))
+            d_DT[cols_true[1]] = np.max(np.abs(d))
+            d_DT[cols_true[2]] = np.mean(np.abs(d_percent))
+            d_DT[cols_true[3]] = np.max(np.abs(d_percent))
             data_DT.append(d_DT)
         #compute CT output and compare with truth
         if framework in ['CT','both']:
             CT[N] = Y[N].solve_PFI()
-            d = np.array(compare(CT['True'][0], CT[N][0])), np.array(compare(CT['True'][1], CT[N][1]))
-            d_CT[cols_true[0]] = np.mean(np.abs(d[1]))
-            d_CT[cols_true[1]] = np.max(np.abs(d[1]))
-            d_CT[cols_true[2]] = np.mean(np.abs(d[0]))
-            d_CT[cols_true[3]] = np.max(np.abs(d[0]))
+            d = np.array(compare(CT['True'][1], CT[N][1]))
+            d_percent = 100*d/CT['True'][1]
+            d_CT[cols_true[0]] = np.mean(np.abs(d))
+            d_CT[cols_true[1]] = np.max(np.abs(d))
+            d_CT[cols_true[2]] = np.mean(np.abs(d_percent))
+            d_CT[cols_true[3]] = np.max(np.abs(d_percent))
             data_CT.append(d_CT)
-        #compare across DT and CT
-        if framework=='both':
-            d = DT[N][0]-CT[N][0], DT[N][1]-CT[N][1]
-            d_compare[cols_compare[0]] = np.mean(np.abs(d[1]))
-            d_compare[cols_compare[1]] = np.max(np.abs(d[1]))
-            d_compare[cols_compare[2]] = np.mean(np.abs(d[0]))
-            d_compare[cols_compare[3]] = np.max(np.abs(d[0]))
-            data_compare.append(d_compare)
     if framework=='DT':
         return pd.DataFrame(data=data_DT,index=N_set,columns=cols_true)
     elif framework=='CT':
         return pd.DataFrame(data=data_CT,index=N_set,columns=cols_true)
     else:
         return pd.DataFrame(data=data_DT,index=N_set,columns=cols_true), \
-        pd.DataFrame(data=data_CT,index=N_set,columns=cols_true), \
-        pd.DataFrame(data=data_compare,index=N_set,columns=cols_compare)
+        pd.DataFrame(data=data_CT,index=N_set,columns=cols_true)
+
+def comparison_data(N_set,DT_dt,CT_dt,method='EGM',prob='KD'):
+    X, Y, DT, CT = {}, {}, {}, {}
+    data_compare = []
+    for N in N_set:
+        print("Number of gridpoints:", N)
+        d_compare = {}
+        X[N] = classes.DT_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
+        N=N,N_t=N_t,N_c=N_c,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
+        show_method=show_method,show_iter=show_iter,show_final=show_final,dt=DT_dt)
+        Y[N] = classes.CT_stat_IFP(rho=rho,r=r,gamma=gamma,mubar=mubar,sigma=sigma,
+        N=N,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
+        show_method=show_method,show_iter=show_iter,show_final=show_final,dt=CT_dt)
+        DT[N] = X[N].solve_PFI(method,prob)
+        CT[N] = Y[N].solve_PFI()
+        d = DT[N][1]-CT[N][1]
+        d_percent = 100*d/CT[N][1]
+        d_compare[cols_compare[0]] = np.mean(np.abs(d))
+        d_compare[cols_compare[1]] = np.max(np.abs(d))
+        d_compare[cols_compare[2]] = np.mean(np.abs(d_percent))
+        d_compare[cols_compare[3]] = np.max(np.abs(d_percent))
+        data_compare.append(d_compare)
+    return pd.DataFrame(data=data_compare,index=N_set,columns=cols_compare)
 
 def accuracy_tables(true_val,N_set,DT_dt,CT_dt,framework='both',method='BF',prob='KD'):
-    #get data once
     if framework=='both':
-        df_DT, df_CT, df_compare = accuracy_data(true_val,N_set,DT_dt,CT_dt,framework,method,prob)
+        df_DT, df_CT = accuracy_data(true_val,N_set,DT_dt,CT_dt,framework,method,prob)
     if framework=='DT':
         df_DT = accuracy_data(true_val,N_set,DT_dt,CT_dt,framework,method,prob)
     if framework=='CT':
@@ -161,14 +184,16 @@ def accuracy_tables(true_val,N_set,DT_dt,CT_dt,framework='both',method='BF',prob
         with open(destin,'w') as tf:
             tf.write(df.to_latex(escape=False,column_format='c'*(len(cols_true)+1)))
 
-    if framework=='both':
-        df = pd.DataFrame(data=df_compare,index=N_set,columns=cols_compare)
-        df = df[cols_compare].round(decimals=n_round_acc)
-        df.index.names = ['Grid size']
+def comparison_tables(N_set,DT_dt,CT_dt,method='EGM',prob='KD'):
+    df_compare = comparison_data(N_set,DT_dt,CT_dt,method,prob)
 
-        destin = '../../main/figures/DT_CT_{0}_accuracy_stat_{1}_{2}_{3}.tex'.format(method,int(10**3*DT_dt),int(10**6*CT_dt),prob)
-        with open(destin,'w') as tf:
-            tf.write(df.to_latex(escape=False,column_format='c'*(len(cols_compare)+1)))
+    df = pd.DataFrame(data=df_compare,index=N_set,columns=cols_compare)
+    df = df[cols_compare].round(decimals=n_round_acc)
+    df.index.names = ['Grid size']
+
+    destin = '../../main/figures/DT_CT_{0}_accuracy_stat_{1}_{2}_{3}.tex'.format(method,int(10**3*DT_dt),int(10**6*CT_dt),prob)
+    with open(destin,'w') as tf:
+        tf.write(df.to_latex(escape=False,column_format='c'*(len(cols_compare)+1)))
 
 #following only uses EGM so no need for method argument
 def time_data(N_set,DT_dt,CT_dt,runs,framework='DT',prob='KD',run_MPFI=True):
@@ -190,11 +215,14 @@ def time_data(N_set,DT_dt,CT_dt,runs,framework='DT',prob='KD',run_MPFI=True):
                 d['PFI'], d_iter['PFI'] = X[N].solve_PFI('EGM',prob)[2:]
                 if run_MPFI==True:
                     d['VFI'], d_iter['VFI'] = X[N].solve_MPFI('EGM',0,X[N].V0,prob)[2:]
+                    for relax in relax_list:
+                        s = r'MPFI ({0})'.format(relax)
+                        d[s], d_iter[s] = X[N].solve_MPFI('EGM',relax,X[N].V0,prob)[2:]
                 else:
                     d['VFI'], d_iter['VFI'] = np.inf, 0
-                for relax in relax_list:
-                    s = r'MPFI ({0})'.format(relax)
-                    d[s], d_iter[s] = X[N].solve_MPFI('EGM',relax,X[N].V0,prob)[2:]
+                    for relax in relax_list:
+                        s = r'MPFI ({0})'.format(relax)
+                        d[s], d_iter[s] = np.inf, 0
                 time_data.append(d)
                 iter_data.append(d_iter)
             else:
@@ -207,6 +235,7 @@ def time_data(N_set,DT_dt,CT_dt,runs,framework='DT',prob='KD',run_MPFI=True):
                 else:
                     d['VFI'], d_iter['VFI'] = np.inf, 0
                     for relax in relax_list:
+                        s = r'MPFI ({0})'.format(relax)
                         d[s], d_iter[s] = np.inf, 0
                 time_data.append(d)
                 iter_data.append(d_iter)
@@ -214,8 +243,6 @@ def time_data(N_set,DT_dt,CT_dt,runs,framework='DT',prob='KD',run_MPFI=True):
         df_iter = df_iter + pd.DataFrame(data=iter_data,index=N_set,columns=cols_time)
     return df.round(decimals=n_round_time)/runs, df_iter/runs
 
-#only EGM in the following so no need for method
-#need true_val for the following?
 def time_tables(N_set,DT_dt,CT_dt,runs,framework='DT',prob='KD'):
     df, df_iter = time_data(N_set,DT_dt,CT_dt,runs,framework,prob=prob)
     df.index.names, df_iter.index.names = ['Grid size'], ['Grid size']
@@ -239,25 +266,31 @@ def time_tables(N_set,DT_dt,CT_dt,runs,framework='DT',prob='KD'):
             tf.write(df_iter.to_latex(escape=False,column_format='c'*(len(cols_time)+1)))
 
 #only EGM in the following so no need for method
-def time_accuracy_data(true_val,N_set,DT_dt,CT_dt,runs,prob='KD'):
+def time_accuracy_data(true_val,N_set,DT_dt,CT_dt,runs,prob='KD',norm='mean'):
     DT, CT = {}, {}
     DT['accuracy'], CT['accuracy'], DT['time'], CT['time'] = [], [], [], []
 
-    df_acc_DT, df_acc_CT, df_acc_compare = accuracy_data(true_val,N_set,DT_dt,CT_dt,framework='both',method='EGM',prob=prob)
+    df_acc_DT, df_acc_CT = accuracy_data(true_val,N_set,DT_dt,CT_dt,framework='both',method='EGM',prob=prob)
     df_DT, df_DT_iter = time_data(N_set,DT_dt,CT_dt,runs,framework='DT',prob=prob,run_MPFI=False)
     df_CT, df_CT_iter = time_data(N_set,DT_dt,CT_dt,runs,framework='CT',prob=prob,run_MPFI=False)
     df_DT = df_DT.fillna(np.inf)
     df_CT = df_CT.fillna(np.inf)
 
     for i in range(len(N_set)):
-        DT['accuracy'].append(df_acc_DT.iloc[i,0])
-        CT['accuracy'].append(df_acc_CT.iloc[i,0])
+        if norm=='mean':
+            DT['accuracy'].append(df_acc_DT.iloc[i,2])
+            CT['accuracy'].append(df_acc_CT.iloc[i,2])
+        else:
+            DT['accuracy'].append(df_acc_DT.iloc[i,3])
+            CT['accuracy'].append(df_acc_CT.iloc[i,3])
+        #DT['time'].append(min(df_DT.iloc[i,:]))
         DT['time'].append(min(df_DT.iloc[i,:]))
         CT['time'].append(min(df_CT.iloc[i,:]))
+        #CT['time'].append(min(df_CT.iloc[i,:]))
     return DT, CT
 
-def time_accuracy_figures(true_val,N_set,DT_dt,CT_dt,runs,prob='KD'):
-    DT, CT = time_accuracy_data(true_val,N_set,DT_dt,CT_dt,runs,prob=prob)
+def time_accuracy_figures(true_val,N_set,DT_dt,CT_dt,runs,prob='KD',norm='mean'):
+    DT, CT = time_accuracy_data(true_val,N_set,DT_dt,CT_dt,runs,prob=prob,norm=norm)
 
     fig, ax = plt.subplots()
     ax.scatter(DT['accuracy'], DT['time'], marker='x',color='darkblue',lw=2,label='Discrete-time')
@@ -265,10 +298,13 @@ def time_accuracy_figures(true_val,N_set,DT_dt,CT_dt,runs,prob='KD'):
     ax.set_yscale('log')
     ax.set_xscale('log')
     plt.ylabel("Time to convergence (seconds)")
-    plt.xlabel("Accuracy")
+    plt.xlabel("Percent deviation from true policy function")
     plt.legend()
-    ax.set_title('Speed versus accuracy tradeoff')
-    destin = '../../main/figures/time_accuracy_{0}_{1}_{2}.eps'.format(int(10**3*DT_dt), int(10**6*CT_dt), prob)
+    if norm=='mean':
+        ax.set_title('Speed versus accuracy ($l_1$ norm)')
+    else:
+        ax.set_title('Speed versus accuracy ($l_{\infty}$ norm)')
+    destin = '../../main/figures/time_accuracy_{0}_{1}_{2}_{3}.eps'.format(int(10**3*DT_dt), int(10**6*CT_dt), prob, norm)
     plt.savefig(destin, format='eps', dpi=1000)
     plt.show()
 
@@ -280,46 +316,40 @@ Create tables (to avoid confusion don't drop parameters prefix)
 Accuracy of CT and DT
 """
 true_val = true_stat_load(parameters.DT_dt, parameters.CT_dt_true, 'KD', parameters.N_true)
-accuracy_tables(true_val, parameters.N_set, parameters.DT_dt, parameters.CT_dt_true, 'both','BF', 'KD')
+accuracy_tables(true_val, parameters.N_set, parameters.DT_dt, parameters.CT_dt_true, 'both','EGM', 'KD')
 """
 Sensitivity of continuous-time methods to timestep (just CT here)
 """
-accuracy_tables(true_val, parameters.N_set, parameters.DT_dt, parameters.CT_dt_mid, 'CT', 'BF', 'KD')
-accuracy_tables(true_val, parameters.N_set, parameters.DT_dt, parameters.CT_dt_big, 'CT', 'BF', 'KD')
+accuracy_tables(true_val, parameters.N_set, parameters.DT_dt, parameters.CT_dt_mid, 'CT', 'EGM', 'KD')
+accuracy_tables(true_val, parameters.N_set, parameters.DT_dt, parameters.CT_dt_big, 'CT', 'EGM', 'KD')
 """
 Difference in CT and DT quantities as DT timestep decreases (only KD)
 """
-for DT_dt in [10**-1, 10**-2]:
-    true_val = true_stat_load(DT_dt, parameters.CT_dt_true, 'KD', parameters.N_true)
-    accuracy_tables(true_val, parameters.N_set, DT_dt, parameters.CT_dt_true, 'both', 'BF', 'KD')
-"""
-EGM accuracy
-"""
-true_val = true_stat_load( parameters.DT_dt, parameters.CT_dt_true, 'KD', parameters.N_true)
-accuracy_tables(true_val, parameters.N_set, parameters.DT_dt, parameters.CT_dt_true, 'DT', 'EGM', 'KD')
+for DT_dt in [10**0, 10**-1, 10**-2]:
+    comparison_tables(parameters.N_set, DT_dt, parameters.CT_dt_true, 'EGM', 'KD')
 """
 Tauchen accuracy
 """
 true_val = true_stat_load(parameters.DT_dt, parameters.CT_dt_true, 'Tauchen', parameters.N_true)
 accuracy_tables(true_val, parameters.N_set, parameters.DT_dt, parameters.CT_dt_true, 'DT', 'EGM', 'Tauchen')
-
 """
 Time
 """
-
-runs=10
+runs=20
 run_time_tables=1
 
 """
 Run times versus grid sizes (tables)
 """
 if run_time_tables==1:
-    true_val = true_stat_load(parameters.DT_dt, parameters.CT_dt_true, prob, parameters.N_true)
-    time_tables( parameters.N_set, parameters.DT_dt, parameters.CT_dt_true, runs, 'DT', 'KD')
-    time_tables( parameters.N_set, parameters.DT_dt, parameters.CT_dt_true, runs, 'CT', 'KD')
+    time_tables( parameters.N_set, parameters.DT_dt, parameters.CT_dt_big, runs, 'DT', 'KD')
+    time_tables( parameters.N_set, parameters.DT_dt, parameters.CT_dt_big, runs, 'CT', 'KD')
 """
 Run times versus accuracy scatterplot (both KD and Tauchen)
 """
+DT_data, CT_data = {}, {}
 for prob in ['KD','Tauchen']:
     true_val = true_stat_load(parameters.DT_dt, parameters.CT_dt_true, prob, parameters.N_true)
-    time_accuracy_figures(true_val, parameters.N_set_scatter, parameters.DT_dt, parameters.CT_dt_true, runs, prob=prob)
+    DT_data[prob], CT_data[prob] = time_accuracy_data(true_val,parameters.N_set_scatter, parameters.DT_dt, parameters.CT_dt_true, runs ,prob,'mean')
+    time_accuracy_figures(true_val, parameters.N_set_scatter, parameters.DT_dt, parameters.CT_dt_true, runs, prob, 'mean')
+    time_accuracy_figures(true_val, parameters.N_set_scatter, parameters.DT_dt, parameters.CT_dt_true, runs, prob, 'sup')
