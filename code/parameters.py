@@ -6,6 +6,19 @@ and income gridscome are from section F of the appendix to Achdou et al:
 
     https://benjaminmoll.com/wp-content/uploads/2019/07/HACT_appendix.pdf
 
+I think we want cols_true and cols_compare to be in percentage terms.
+
+cols_true = ['$||c - c_{\textnormal{true}}||_1$',
+'$||c - c_{\textnormal{true}}||_{\infty}$',
+'$||c/c_{\textnormal{true}}-1||_1$',
+'$||c/c_{\textnormal{true}}-1||_{\infty}$']
+
+cols_compare = ['$||c_{DT} - c_{CT}||_1$',
+'$||c_{DT} - c_{CT}||_{\infty}$',
+'$||c_{DT}/c_{CT} - 1||_1$',
+'$||c_{DT}/c_{CT} - 1||_{\infty}$']
+
+
 """
 
 import numpy as np
@@ -33,7 +46,7 @@ show_method, show_iter, show_final = 0, 0, 0
 Grid parameters ("true" values and grids for tables and scatterplot)
 """
 
-N_true = (3000, 10)
+N_true = (10000, 10)
 N_c = 5000
 N_set = [(50,10), (100,10), (250,10), (500,10), (1000,10)]
 N_grid = np.linspace(np.log(50), np.log(1000), 10)
@@ -57,15 +70,13 @@ c1,c2='lightsteelblue','darkblue'
 def colorFader(c1,c2,mix):
     return mpl.colors.to_hex((1-mix)*np.array(mpl.colors.to_rgb(c1)) + mix*np.array(mpl.colors.to_rgb(c2)))
 
-cols_true = ['$||c - c_{\textnormal{true}}||_1$',
-'$||c - c_{\textnormal{true}}||_{\infty}$',
-'$||V - V_{\textnormal{true}}||_1$',
-'$||V - V_{\textnormal{true}}||_{\infty}$']
+#I think we want this to be \Delta c and then \Delta c (\%)
 
-cols_compare = ['$||c_{DT} - c_{CT}||_1$',
-'$||c_{DT} - c_{CT}||_{\infty}$',
-'$||V_{DT} - V_{CT}||_1$',
-'$||V_{DT} - V_{CT}||_{\infty}$']
+cols_true = ['$||\Delta c||_1$','$||\Delta c||_{\infty}$',
+'$||\Delta c (\%)||_1$','$||\Delta c (\%)||_{\infty}$']
+
+cols_compare = ['$||\Delta c||_1$','$||\Delta c||_{\infty}$',
+'$||\Delta c (\%)||_1$','$||\Delta c (\%)||_{\infty}$']
 
 relax_list = relax_list
 cols_time = ['VFI']

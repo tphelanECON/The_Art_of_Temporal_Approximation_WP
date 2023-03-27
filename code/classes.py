@@ -266,7 +266,7 @@ class DT_IFP(object):
         i, eps, V = 0, 1, V_init
         tic = time.time()
         while i < self.maxiter and eps > self.tol:
-            if (i % 20 == 0) & (self.show_iter == 1):
+            if (i % 10 == 0) & (self.show_iter == 1):
                 print("Iteration:", i, "Difference:", eps)
             c = self.polupdate(method,V,prob,1)
             V_prime = self.MPFI(c,V,M,prob)
@@ -298,7 +298,7 @@ class DT_IFP(object):
             print("Time taken:", toc-tic)
         tic = time.time()
         for k in range(self.NA-1):
-            if (int(self.NA-1-k-1) % 20 ==0):
+            if (int(self.NA-1-k-1) % 10 ==0):
                 print("Age:",self.NA-1-k-1)
             tc1 = time.time()
             c[:,:,self.NA-1-k-1] = self.polupdate(method,V[:,:,self.NA-1-k],prob,0)
@@ -442,7 +442,7 @@ class CT_stat_IFP(object):
         V, i, eps = self.V0, 1, 1
         tic = time.time()
         while i < self.maxiter and eps > self.tol:
-            if (i % 20 == 0) & (self.show_iter == 1):
+            if (i % 10 == 0) & (self.show_iter == 1):
                 print("Iteration:", i, "Difference:", eps)
             V1 = self.MPFI(self.polupdate(V),V,M)
             eps = np.amax(np.abs(V1-V))
@@ -654,7 +654,7 @@ class CT_nonstat_IFP(object):
         c[:,:,self.N[2]-1] = self.polupdate_slice(V[:,:,-1])
         tic = time.time()
         for k in range(self.N[2]-1):
-            if (int(self.N[2]-1-k-1) % 20 == 0) & (self.show_iter == 1):
+            if (int(self.N[2]-1-k-1) % 10 == 0) & (self.show_iter == 1):
                 print("Age:", self.N[2]-1-k-1)
             tV1 = time.time()
             V[:,:,self.N[2]-1-k-1] = self.solveVslice(V[:,:,self.N[2]-1-k],c[:,:,self.N[2]-1-k])
