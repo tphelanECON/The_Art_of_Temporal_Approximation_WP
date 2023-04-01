@@ -42,6 +42,7 @@ Discussion of boundaries:
     * In CT, V vanishes at Abar. We only compute values at Abar - DeltaA, Abar - 2*DeltaA, etc.
     * This is also true in the DT case (see nonstat_solve).
 
+I discovered that the biggest time sink is in the interpolation in the brute force case.
 """
 
 import numpy as np
@@ -178,7 +179,6 @@ class DT_IFP(object):
         cnew = np.zeros((self.N[0]+1,self.N[1]+1))
         if method=='BF':
             #expected value of future utility, as function of consumption guess:
-            V_cont = np.zeros((self.N[0]+1,self.N[1]+1,self.N_c))
             ii_, jj_, cc_ = np.meshgrid(range(self.N[0]+1),range(self.N[1]+1),range(self.N_c),indexing='ij')
             if stat==1:
                 cgrid_rest = np.linspace(np.maximum(self.clow,10**-8), np.minimum(self.chigh, np.max(self.cmax)), self.N_c)
@@ -186,14 +186,16 @@ class DT_IFP(object):
                 cgrid_rest = np.linspace(np.maximum(self.clow,10**-8), np.minimum(self.chigh, 10*np.max(self.cmax)), self.N_c)
             #cgrid_rest is 3D. Need to transpose s.t. c is in the last dimension.
             cgrid_rest = np.transpose(cgrid_rest, axes=[1, 2, 0])
-            b_prime = (1 + self.dt*self.r)*(self.grid[0][ii_] + self.dt*(self.ybar*np.exp(self.grid[1][jj_]) - cgrid_rest))
-            V_interp = [interp1d(self.grid[0], V[:,k])(b_prime) for k in range(self.N[1]+1)]
-            for k in range(self.N[1]+1):
-                V_cont = V_cont + self.p_z[prob][ii_,jj_,k]*V_interp[k]
-            RHS = self.dt*self.u(cgrid_rest) + np.exp(-self.rho*self.dt)*V_cont
-            #find consumption through pointwise minimization:
-            cnew = np.array([cgrid_rest[key[0],key[1],np.argmin(-RHS[key[0],key[1],:])] for key in self.iter_keys])
-            cnew = cnew.reshape((self.N[0]+1,self.N[1]+1))
+            for i in range(self.N[0]+1):
+                for j in range(self.N[1]+1):
+                    V_cont = np.zeros((self.N_c,))
+                    b_prime = (1 + self.dt*self.r)*(self.grid[0][i] + self.dt*(self.ybar*np.exp(self.grid[1][j]) - cgrid_rest[i,j,:]))
+                    #V_interp = [interp1d(self.grid[0], V[:,k])(b_prime) for k in range(self.N[1]+1)]
+                    V_interp = [np.interp(b_prime, self.grid[0], V[:,k]) for k in range(self.N[1]+1)]
+                    for k in range(self.N[1]+1):
+                        V_cont = V_cont + self.p_z[prob][i,j,k]*V_interp[k]
+                    RHS = self.dt*self.u(cgrid_rest[i,j,:]) + np.exp(-self.rho*self.dt)*V_cont
+                    cnew[i,j] = cgrid_rest[i,j,np.argmin(-RHS)]
         else:
             #now follow EGM:
             bb, zz = self.grid[0][self.ii], self.grid[1][self.jj]
@@ -319,18 +321,21 @@ class DT_IFP(object):
         if self.show_method==1:
             print("Starting PFI with {0} policy updates and {1} probabilities".format(method,prob))
         i, eps, V = 0, 1, self.V(self.c0,prob)
-        tic = time.time()
+        tic0 = time.time()
         while i < self.maxiter_PFI and eps > self.tol:
             if self.show_iter == 1:
                 print("Iteration:", i, "Difference:", eps)
+            tic=time.time()
             c = self.polupdate(method,V,prob,stat=1)
             V_prime = self.V(c,prob)
+            toc=time.time()
+            #print("Time for one iteration:",toc-tic)
             if np.max(np.isnan(c))==True:
                 eps, i = -1, self.maxiter_PFI
             else:
                 eps, i = np.max(np.abs(V-V_prime)), i + 1
             V = V_prime
-        toc = time.time()
+        toc0 = time.time()
         if (np.max(np.isnan(c))==True) or (np.max(np.isnan(V))==True):
             print("Problem: nans encountered")
             return -1 + 0*V, -1 + 0*V, np.nan, self.maxiter_PFI
@@ -338,7 +343,7 @@ class DT_IFP(object):
             if self.show_final==1:
                 print("Iterations and difference:", (i, eps))
                 print("Time taken:", toc-tic)
-            return V, c, toc-tic, i
+            return V, c, toc0-tic0, i
 
     #following used in the contruction of transition matrix P.
     def P_func(self,A,B,C):
