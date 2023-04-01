@@ -9,8 +9,6 @@ this discrete-time problem but is not assured to do so.
 Relevant class constructors in classes.py:
     DT_IFP: discrete-time IFP (stationary and age-dependent)
     CT_stat_IFP: continuous-time stationary IFP
-
-
 """
 
 import os, sys, inspect
@@ -43,7 +41,7 @@ CT_dt = parameters.CT_dt_true
 N_t = parameters.N_t
 
 X = classes.DT_IFP(rho=rho,r=r,gamma=gamma,ybar=ybar,mubar=mubar,sigma=sigma,
-N=N,bnd=bnd,NA=NA,maxiter=maxiter,tol=tol,show_method=show_method,
+N=N,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,show_method=show_method,
 show_iter=show_iter,show_final=show_final,dt=DT_dt)
 
 Y = classes.CT_stat_IFP(rho=rho,r=r,gamma=gamma,ybar=ybar,mubar=mubar,sigma=sigma,
@@ -56,32 +54,16 @@ Define dictionaries for discrete-time and continuous-time problems.
 
 prob = 'KD'
 DT, CT = {}, {}
-pol_method_list = ['EGM']
-val_method_list = ['PFI'] #'MPFI',
+pol_method_list = ['BF','EGM']
+val_method_list = ['PFI']
 print("Running continuous-time problems")
 CT = Y.solve_PFI()
 
 print("Running discrete-time problems")
 for pol_method in pol_method_list:
     #DT[(pol_method,'MPFI')] = X.solve_MPFI(pol_method,10,X.V0,prob=prob)
-    DT[(pol_method,'MPFI')] = X.solve_MPFI(pol_method,10,CT[0],prob=prob)
-    #DT[(pol_method,'PFI')] = X.solve_PFI(pol_method,prob=prob)
-
-t = {}
-Z = {}
-
-for N in [(1000,10), (2000,10), (3000,10), (4000,10), (5000,10)]:
-    print("Computing PFI for DT setting with N = {0}".format(N))
-    Z[N] = classes.DT_IFP(rho=rho,r=r,gamma=gamma,ybar=ybar,mubar=mubar,sigma=sigma,
-    N=N,bnd=bnd,NA=NA,maxiter=maxiter,tol=tol,show_method=show_method,
-    show_iter=show_iter,show_final=show_final,dt=DT_dt)
-    sol = Z[N].solve_MPFI(pol_method,0,Z[N].V0,prob=prob)
-    #sol = Z[N].solve_PFI(pol_method,prob=prob)
-    t[N] = sol[2]
-
-
-
-
+    #DT[(pol_method,'MPFI')] = X.solve_MPFI(pol_method,10,CT[0],prob=prob)
+    DT[(pol_method,'PFI')] = X.solve_PFI(pol_method,prob=prob)
 
 """
 Figures
@@ -108,6 +90,8 @@ for pol_method in pol_method_list:
         destin = '../../main/figures/DT_V_{0}_{1}.eps'.format(pol_method, val_method)
         plt.savefig(destin, format='eps', dpi=1000)
         plt.show()
+        plt.close()
+
         fig, ax = plt.subplots()
         for j in range(N[1]+1):
             color = colorFader(c1,c2,j/(N[1]+1))
@@ -191,6 +175,7 @@ plt.title('Value function differences')
 destin = '../../main/figures/DT_CT_compare_V.eps'
 plt.savefig(destin, format='eps', dpi=1000)
 plt.show()
+plt.close()
 
 fig, ax = plt.subplots()
 for j in range(N[1]+1):
@@ -206,24 +191,4 @@ plt.title('Policy function differences')
 destin = '../../main/figures/DT_CT_compare_c.eps'
 plt.savefig(destin, format='eps', dpi=1000)
 plt.show()
-
-"""
-Now the difference in assets in the stationary environment
-"""
-
-fig, ax = plt.subplots()
-for j in range(N[1]+1):
-    color = colorFader(c1,c2,j/(N[1]+1))
-    c, y = DT[(pol_method,'PFI')][1][:,j], X.ybar*np.exp(X.grid[1][:])
-    d_assets = (1 + X.dt*X.r)*(X.grid[0] + y[j] - c) - X.grid[0]
-    if j in [0,N[1]]:
-        inc = X.ybar*np.round(np.exp(X.grid[1][j]),2)
-        ax.plot(X.grid[0], d_assets, color=color, label="Income {0}".format(inc), linewidth=1)
-    else:
-        ax.plot(X.grid[0], d_assets, color=color, linewidth=1)
-plt.xlabel('Assets $b$')
-plt.legend()
-plt.title('Difference in assets $\Delta b$ in stationary problem')
-destin = '../../main/figures/DT_stat_drift.eps'
-plt.savefig(destin, format='eps', dpi=1000)
-plt.show()
+plt.close()

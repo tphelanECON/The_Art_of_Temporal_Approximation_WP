@@ -5,21 +5,19 @@ March 2023: I no longer think that comparison with the brute force case is the
 most useful benchmark in the DT case. I will instead simply use EGM for the
 "true" and approximate quantities.
 
-We need (at least) five of these (possibly more):
+March 28: I changed my mind again. I now think that we need to compute against
+the brute force method, because the EGM seems to "converge" to something that
+isn't quite right.
+
+We need (at least) three of these (possibly more):
     * One for the continuous-time case, using the "small" dt = 10**-6.
-    * Three for the discrete-time case with KD transitions, using dt= 1, 0.1,
-    and 0.01, resp., to document convergence of CT and DT quantities to one another.
+    * One for the discrete-time case with KD transitions, using dt= 1,
     * One for the discrete-time case with Tauchen transitions, using dt = 1.
 
-No. Just want Dt = 1 for this.
-
-Recall that the KD transitions in the discrete-time case with timestep dt are
-always calculated by constructing the transition probabilites for some fixed
-choice of small dt used in the continuous-time case and then sampling this at a
-lower frequency.
-
-It will take an enormous amount of time to compute the smaller timesteps in DT
-using VFI. But do we ever actually use these? Not clear.
+No need for the "true" discrete-time quantities with dt=0.1 and dt=0.01. I do
+not think this adds anything beyond the comparisons on coarser grids, because
+if one fixes a timestep then there is no reason to think that DT and CT will
+converge as one increases the number of asset points.
 """
 
 import os, sys, inspect
@@ -52,11 +50,11 @@ N_c = parameters.N_c
 """
 Time steps used.
 """
-CT_dt_true = parameters.CT_dt_true
-DT_dt = parameters.DT_dt
 """
-Function creating true discrete-time quantities.
-Arguments: timestep DT_dt and transition probabilities "prob" (KD or Tauchen).
+Function creating true discrete-time quantities. Arguments:
+    * timestep DT_dt
+    * transition probabilities "prob" (KD or Tauchen)
+    * size of "true" quantities
 """
 def true_DT_stat(DT_dt,prob,N_true):
     destin = '../../main/true_values/true_V_{0}_stat_{1}_{2}_{3}_{4}.csv'.format('DT',int(10**3*DT_dt),prob,N_true[0],N_true[1])
@@ -69,8 +67,8 @@ def true_DT_stat(DT_dt,prob,N_true):
         N=N_true,N_t=N_t,N_c=N_c,bnd=bnd,maxiter=maxiter,maxiter_PFI=maxiter_PFI,tol=tol,
         show_method=show_method,show_iter=show_iter,show_final=show_final,dt=DT_dt)
         print("Now solving for {0} gridpoints".format(N_true))
-        V, c = X.solve_MPFI('EGM',0,X.V0,prob)[0:2]
-        #V, c = X.solve_PFI(method='BF',prob=prob)[0:2]
+        #V, c = X.solve_MPFI('EGM',0,X.V0,prob)[0:2]
+        V, c = X.solve_PFI(method='BF',prob=prob)[0:2]
         destin = '../../main/true_values/true_V_{0}_stat_{1}_{2}_{3}_{4}.csv'.format('DT',int(10**3*DT_dt),prob,N_true[0],N_true[1])
         pd.DataFrame(V).to_csv(destin, index=False)
         destin = '../../main/true_values/true_c_{0}_stat_{1}_{2}_{3}_{4}.csv'.format('DT',int(10**3*DT_dt),prob,N_true[0],N_true[1])
@@ -96,29 +94,26 @@ def true_CT_stat(CT_dt,N_true):
 Now build the true discrete-time and continuous-time quantities if they do not exist
 """
 
-true_CT_stat(CT_dt_true,parameters.N_true)
-true_DT_stat(10**0,'KD',parameters.N_true)
-#true_DT_stat(10**-1,'KD',parameters.N_true)
-#true_DT_stat(10**-2,'KD',parameters.N_true)
-true_DT_stat(10**0,'Tauchen',parameters.N_true)
+for i in range(len(parameters.income_set)):
+    true_CT_stat(parameters.CT_dt_true,parameters.N_true_set[i])
+    true_DT_stat(parameters.DT_dt,'KD',parameters.N_true_set[i])
+    true_DT_stat(parameters.DT_dt,'Tauchen',parameters.N_true_set[i])
 
 """
 Following loads the true quantities. It will throw an error if none exist.
 """
 def true_stat_load(DT_dt,CT_dt,prob,N_true):
     true_val = {}
-    destin = '../../main/true_values/true_V_{0}_stat_{1}_{2}_{3}_{4}.csv'.format('DT',int(10**3*DT_dt),prob,N_true[0],N_true[1])
-    if os.path.exists(destin):
-        V = pd.read_csv(destin)
-    destin = '../../main/true_values/true_c_{0}_stat_{1}_{2}_{3}_{4}.csv'.format('DT',int(10**3*DT_dt),prob,N_true[0],N_true[1])
-    if os.path.exists(destin):
-        c = pd.read_csv(destin)
-    true_val['DT'] = np.array(V), np.array(c)
-    destin = '../../main/true_values/true_V_{0}_stat_{1}_{2}_{3}.csv'.format('CT',int(10**6*CT_dt),N_true[0],N_true[1])
-    if os.path.exists(destin):
-        V = pd.read_csv(destin)
-    destin = '../../main/true_values/true_c_{0}_stat_{1}_{2}_{3}.csv'.format('CT',int(10**6*CT_dt),N_true[0],N_true[1])
-    if os.path.exists(destin):
-        c = pd.read_csv(destin)
-    true_val['CT'] = np.array(V), np.array(c)
+    destin_V = '../../main/true_values/true_V_{0}_stat_{1}_{2}_{3}_{4}.csv'.format('DT',int(10**3*DT_dt),prob,N_true[0],N_true[1])
+    destin_c = '../../main/true_values/true_c_{0}_stat_{1}_{2}_{3}_{4}.csv'.format('DT',int(10**3*DT_dt),prob,N_true[0],N_true[1])
+    if os.path.exists(destin_V) and os.path.exists(destin_c):
+        V = pd.read_csv(destin_V)
+        c = pd.read_csv(destin_c)
+        true_val['DT'] = np.array(V), np.array(c)
+    destin_V = '../../main/true_values/true_V_{0}_stat_{1}_{2}_{3}.csv'.format('CT',int(10**6*CT_dt),N_true[0],N_true[1])
+    destin_c = '../../main/true_values/true_c_{0}_stat_{1}_{2}_{3}.csv'.format('CT',int(10**6*CT_dt),N_true[0],N_true[1])
+    if os.path.exists(destin_V) and os.path.exists(destin_c):
+        V = pd.read_csv(destin_V)
+        c = pd.read_csv(destin_c)
+        true_val['CT'] = np.array(V), np.array(c)
     return true_val
