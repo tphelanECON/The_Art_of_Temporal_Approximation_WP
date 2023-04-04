@@ -1,5 +1,5 @@
 """
-Accuracy and run times for stationary income fluctuation problems.
+Accuracy and run times for stationary IFPs.
 
 Relevant class constructors imported from classes.py:
     DT_IFP: discrete-time IFP (stationary and age-dependent).
@@ -9,29 +9,19 @@ All solve functions (solve_MPFI, solve_PFI) in above class constructors
 return quadruples (V, c, toc-tic, i) where i = no. of iterations.
 
 Methods:
-
-    * accuracy_data(true_val,N_set,DT_dt,CT_dt,framework='both',method='BF',prob='KD'):
-    takes dictionary true_val of true values, list of grid sizes N_set for
-    assets and income, DT time step DT_dt and CT time step CT_dt and returns
-    either one or three dataframes, indicating distance between computed and "true"
-    values, or difference between the computed quantities across DT and CT.
-    For DT also specify policy updating method, 'BF' or 'EGM'.
-    * accuracy_tables(true_val,N_set,DT_dt,CT_dt,framework='both',method='BF',prob='KD'):
-    produces tables using accuracy_data.
-    * time_data(N_set,DT_dt,CT_dt,runs,framework,prob,run_MPFI=True): computes
-    run times to solve problems on grids given by N_set, for DT and CT. Averages
-    over 'runs' number of runs. run_MPFI=False avoids performing ANY of the MPFI.
-    * time_accuracy_data(true_val,N_set,DT_dt,CT_dt,runs,prob): creates tables using time_data.
-    * time_tables(N_set,DT_dt,CT_dt,runs,framework='DT',prob='KD'): creates
-    tables for the time taken to solve problems on various grids.
-    * time_accuracy_figures(true_val,N_set,DT_dt,CT_dt,runs,prob='KD'): creates the scatterplot.
-
-true_stat(DT_dt,CT_dt,prob) gets "true" discrete-time and continuous-time value
-functions and policy functions. Returns dictionary with keys ['DT', 'CT'] and for
-each returns V, c tuple. This function is called here but defined in true_stat.py.
-
-Concern. For the scatterplot I think we should allow for MPFI with a large
-number of relaxations. Otherwise we aren't being fair to EGM.
+    * accuracy_data(true_val,N_set,DT_dt,CT_dt,framework,method,prob)
+    true_val = dict of true values, N_set = list of grids for (assets, income).
+    Returns one or two dfs indicating diff between computed and "true" values.
+    * comparison_data(N_set,DT_dt,CT_dt,method,prob) compare output across DT, CT.
+    * accuracy_tables(true_val,N_set,DT_dt,CT_dt,framework,method,prob) produces
+    tables using accuracy_data.
+    * comparison_tables(N_set,DT_dt,CT_dt,method,prob): tables for comparison_data.
+    * time_data(N_set,DT_dt,CT_dt,runs,framework,prob,run_MPFI=True) computes
+    average run times per grids in N_set. run_MPFI=False avoids performing VFI.
+    * time_tables(N_set,DT_dt,CT_dt,runs,framework='DT',prob='KD') tables
+    for time taken to solve problems on various grids.
+    * time_accuracy_data(true_val,N_set,DT_dt,CT_dt,runs,prob,norm): data for time_accuracy_figures.
+    * time_accuracy_figures(true_val,N_set,DT_dt,CT_dt,runs,prob) creates scatterplots.
 """
 
 import os, sys, inspect
@@ -46,6 +36,7 @@ import time, classes, parameters
 import matplotlib.pyplot as plt
 if not os.path.exists('../../main/true_values'):
     os.makedirs('../../main/true_values')
+import true_stat
 from true_stat import true_stat_load
 
 c1, c2 = parameters.c1, parameters.c2
@@ -74,7 +65,8 @@ Want to rewrite following in percentage deviations of policy function.
 
 def accuracy_data(true_val,N_set,DT_dt,CT_dt,framework='both',method='EGM',prob='KD'):
     N_true_shape = true_val['DT'][0].shape
-    if N_true_shape[1]-1!=N_set[0][1]:
+    N_I = N_set[0][1]
+    if N_true_shape[1]-1!=N_I:
         print("Error: true value has different number of income points than test values")
     X, Y, DT, CT = {}, {}, {}, {}
     if framework in ['DT','both']:
@@ -150,9 +142,9 @@ def comparison_data(N_set,DT_dt,CT_dt,method='EGM',prob='KD'):
         data_compare.append(d_compare)
     return pd.DataFrame(data=data_compare,index=N_set,columns=cols_compare)
 
-#I think the following should be indexed by income points
+#destinations in following are indexed by number of income points
 def accuracy_tables(true_val,N_set,DT_dt,CT_dt,framework='both',method='BF',prob='KD'):
-    N_true_shape = true_val['DT'][0].shape
+    N_I = N_set[0][1]
     if framework=='both':
         df_DT, df_CT = accuracy_data(true_val,N_set,DT_dt,CT_dt,framework,method,prob)
     if framework=='DT':
@@ -164,7 +156,7 @@ def accuracy_tables(true_val,N_set,DT_dt,CT_dt,framework='both',method='BF',prob
         df = pd.DataFrame(data=df_DT,index=N_set,columns=cols_true)
         df = df[cols_true].round(decimals=n_round_acc)
         df.index.names = ['Grid size']
-        destin = '../../main/figures/DT_{0}_accuracy_stat_{1}_{2}_{3}.tex'.format(method,int(10**3*DT_dt),prob,N_true_shape[1]-1)
+        destin = '../../main/figures/DT_{0}_accuracy_stat_{1}_{2}_{3}.tex'.format(method,int(10**3*DT_dt),prob,N_I)
         with open(destin,'w') as tf:
             tf.write(df.to_latex(escape=False,column_format='c'*(len(cols_true)+1)))
 
@@ -172,14 +164,13 @@ def accuracy_tables(true_val,N_set,DT_dt,CT_dt,framework='both',method='BF',prob
         df = pd.DataFrame(data=df_CT,index=N_set,columns=cols_true)
         df = df[cols_true].round(decimals=n_round_acc)
         df.index.names = ['Grid size']
-        destin = '../../main/figures/CT_accuracy_stat_{0}_{1}_{2}.tex'.format(int(10**6*CT_dt),prob,N_true_shape[1]-1)
+        destin = '../../main/figures/CT_accuracy_stat_{0}_{1}_{2}.tex'.format(int(10**6*CT_dt),prob,N_I)
         with open(destin,'w') as tf:
             tf.write(df.to_latex(escape=False,column_format='c'*(len(cols_true)+1)))
 
 def comparison_tables(N_set,DT_dt,CT_dt,method='EGM',prob='KD'):
     N_I = N_set[0][1]
     df_compare = comparison_data(N_set,DT_dt,CT_dt,method,prob)
-
     df = pd.DataFrame(data=df_compare,index=N_set,columns=cols_compare)
     df = df[cols_compare].round(decimals=n_round_acc)
     df.index.names = ['Grid size']
@@ -188,9 +179,8 @@ def comparison_tables(N_set,DT_dt,CT_dt,method='EGM',prob='KD'):
     with open(destin,'w') as tf:
         tf.write(df.to_latex(escape=False,column_format='c'*(len(cols_compare)+1)))
 
-#following only uses EGM so no need for method argument
-#following is perhaps a little strange because we eliminate MPFI from the CT
-#framework but not the DT framework.
+#following only uses EGM; no need for 'method' argument. note we eliminate MPFI
+#from CT framework but not DT framework.
 def time_data(N_set,DT_dt,CT_dt,runs,framework='DT',prob='KD',run_MPFI=True):
     df = pd.DataFrame(data=0,index=N_set,columns=cols_time)
     df_iter = pd.DataFrame(data=0,index=N_set,columns=cols_time)
@@ -235,6 +225,7 @@ def time_data(N_set,DT_dt,CT_dt,runs,framework='DT',prob='KD',run_MPFI=True):
         df_iter = df_iter + pd.DataFrame(data=iter_data,index=N_set,columns=cols_time)
     return df.round(decimals=n_round_time)/runs, df_iter/runs
 
+#run times recorded by grid
 def time_tables(N_set,DT_dt,CT_dt,runs,framework='DT',prob='KD'):
     N_I = N_set[0][1]
     df, df_iter = time_data(N_set,DT_dt,CT_dt,runs,framework,prob=prob)
@@ -260,7 +251,6 @@ def time_tables(N_set,DT_dt,CT_dt,runs,framework='DT',prob='KD'):
 
 #only EGM in the following so no need for method
 def time_accuracy_data(true_val,N_set,DT_dt,CT_dt,runs,prob='KD',norm='mean'):
-    N_true_shape = true_val['DT'][0].shape
     DT, CT = {}, {}
     DT['accuracy'], CT['accuracy'], DT['time'], CT['time'] = [], [], [], []
 
@@ -277,15 +267,14 @@ def time_accuracy_data(true_val,N_set,DT_dt,CT_dt,runs,prob='KD',norm='mean'):
         else:
             DT['accuracy'].append(df_acc_DT.iloc[i,3])
             CT['accuracy'].append(df_acc_CT.iloc[i,3])
-        #DT['time'].append(min(df_DT.iloc[i,:]))
         DT['time'].append(min(df_DT.iloc[i,:]))
         CT['time'].append(min(df_CT.iloc[i,:]))
-        #CT['time'].append(min(df_CT.iloc[i,:]))
     return DT, CT
 
+#following makes the scatterplots
 def time_accuracy_figures(true_val,N_set,DT_dt,CT_dt,runs,prob='KD',norm='mean'):
     DT, CT = time_accuracy_data(true_val,N_set,DT_dt,CT_dt,runs,prob=prob,norm=norm)
-    N_true_shape = true_val['DT'][0].shape
+    N_I = N_set[0][1]
 
     fig, ax = plt.subplots()
     ax.scatter(DT['accuracy'], DT['time'], marker='x',color='darkblue',lw=2,label='Discrete-time')
@@ -296,36 +285,22 @@ def time_accuracy_figures(true_val,N_set,DT_dt,CT_dt,runs,prob='KD',norm='mean')
     plt.xlabel("Percent deviation from true policy function")
     plt.legend()
     if norm=='mean':
-        ax.set_title('Speed vs accuracy $l_1$ norm' + '({0} income points)'.format(N_true_shape[1]-1))
+        ax.set_title('$l_1$ norm' + ' ({0} income points)'.format(N_true_shape[1]-1))
     else:
-        ax.set_title('Speed vs accuracy $l_{\infty}$ norm' + '({0} income points)'.format(N_true_shape[1]-1))
-    destin = '../../main/figures/time_accuracy_{0}_{1}_{2}_{3}_{4}.eps'.format(int(10**3*DT_dt), int(10**6*CT_dt), prob, norm, N_true_shape[1]-1)
+        ax.set_title('$l_{\infty}$ norm' + '({0} income points)'.format(N_true_shape[1]-1))
+    destin = '../../main/figures/time_accuracy_{0}_{1}_{2}_{3}_{4}.eps'.format(int(10**3*DT_dt), int(10**6*CT_dt), prob, norm, N_I)
     plt.savefig(destin, format='eps', dpi=1000)
     #plt.show()
     plt.close()
 
 """
-Create tables (to avoid confusion don't drop parameters prefix)
-"""
-
-"""
-Accuracy of CT and DT.
-
-Each of the following compares solutions computed on the grids in
-parameters.N_set with the "true" solutions computed elsewhere.
-
-Loop over the income values.
-
+Create tables and scatterplots
 """
 
 runs = 10
 run_time_tables = 0
 
-#true_val = true_stat_load(parameters.DT_dt, parameters.CT_dt_true, 'KD', parameters.N_true_set[0])
-#accuracy_tables(true_val, [(10,5),(25,5),(50,5),(100,5),(1000,5),(2000,5),(4000,5)], parameters.DT_dt, parameters.CT_dt_true, 'CT','EGM', 'KD')
-
-for i in range(1):
-#for i in range(len(parameters.income_set)):
+for i in range(len(parameters.income_set)):
     true_val = true_stat_load(parameters.DT_dt, parameters.CT_dt_true, 'KD', parameters.N_true_set[i])
     accuracy_tables(true_val, parameters.N_sets[i], parameters.DT_dt, parameters.CT_dt_true, 'both','EGM', 'KD')
     """
@@ -349,9 +324,6 @@ for i in range(1):
     """
     true_val = true_stat_load(parameters.DT_dt, parameters.CT_dt_true, 'Tauchen', parameters.N_true_set[i])
     accuracy_tables(true_val, parameters.N_sets[i], parameters.DT_dt, parameters.CT_dt_true, 'DT', 'EGM', 'Tauchen')
-    """
-    Time
-    """
     """
     Run times versus grid sizes. Only time we use the "big" CT timestep.
     """

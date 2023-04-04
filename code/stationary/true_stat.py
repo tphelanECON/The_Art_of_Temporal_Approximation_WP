@@ -1,23 +1,15 @@
 """
 Create all of the "true" values in the stationary setting (if they do not exist).
 
-March 2023: I no longer think that comparison with the brute force case is the
-most useful benchmark in the DT case. I will instead simply use EGM for the
-"true" and approximate quantities.
+We need three of these (possibly more):
+    * One for the CT case, using the "small" dt = 10**-6.
+    * One for the DT case with KD transitions, using dt= 1,
+    * One for the DT case with Tauchen transitions, using dt = 1.
 
-March 28: I changed my mind again. I now think that we need to compute against
-the brute force method, because the EGM seems to "converge" to something that
-isn't quite right.
+No DT quantities for dt=0.1, 0.01. Does not add anything beyond comparison on coarse grids.
 
-We need (at least) three of these (possibly more):
-    * One for the continuous-time case, using the "small" dt = 10**-6.
-    * One for the discrete-time case with KD transitions, using dt= 1,
-    * One for the discrete-time case with Tauchen transitions, using dt = 1.
-
-No need for the "true" discrete-time quantities with dt=0.1 and dt=0.01. I do
-not think this adds anything beyond the comparisons on coarser grids, because
-if one fixes a timestep then there is no reason to think that DT and CT will
-converge as one increases the number of asset points.
+true_stat(DT_dt,CT_dt,prob) gets "true" discrete-time and continuous-time value
+and policy functions. Returns dict with keys ['DT', 'CT']; for each returns V, c.
 """
 
 import os, sys, inspect
@@ -89,18 +81,16 @@ def true_CT_stat(CT_dt,N_true):
         pd.DataFrame(V).to_csv(destin, index=False)
         destin = '../../main/true_values/true_c_{0}_stat_{1}_{2}_{3}.csv'.format('CT',int(10**6*CT_dt),N_true[0],N_true[1])
         pd.DataFrame(c).to_csv(destin, index=False)
-
 """
-Now build the true discrete-time and continuous-time quantities if they do not exist
+Build true DT and CT quantities if they do not exist
 """
-
-for i in range(len(parameters.income_set)):
+for i in range(1,3):
+#for i in range(len(parameters.income_set)):
     true_CT_stat(parameters.CT_dt_true,parameters.N_true_set[i])
     true_DT_stat(parameters.DT_dt,'KD',parameters.N_true_set[i])
     true_DT_stat(parameters.DT_dt,'Tauchen',parameters.N_true_set[i])
-
 """
-Following loads the true quantities. It will throw an error if none exist.
+Following loads true quantities, showing an error if none exist.
 """
 def true_stat_load(DT_dt,CT_dt,prob,N_true):
     true_val = {}

@@ -4,7 +4,7 @@ Figures for example policy and value functions in the stationary setting.
 Systematic exploration of run times and accuracy occurs elsewhere.
 
 This script solves both using PFI. Note that this HAPPENS to converge for
-this discrete-time problem but is not assured to do so.
+this discrete-time problem but is not ASSURED to do so.
 
 Relevant class constructors in classes.py:
     DT_IFP: discrete-time IFP (stationary and age-dependent)
@@ -34,7 +34,6 @@ show_method, show_iter, show_final = parameters.show_method, parameters.show_ite
 show_method, show_iter, show_final = 1,1,1
 ybar = parameters.ybar
 
-NA = 60
 N = parameters.Nexample
 DT_dt = parameters.DT_dt
 CT_dt = parameters.CT_dt_true
@@ -54,7 +53,8 @@ Define dictionaries for discrete-time and continuous-time problems.
 
 prob = 'KD'
 DT, CT = {}, {}
-pol_method_list = ['BF','EGM']
+#pol_method_list = ['BF','EGM']
+pol_method_list = ['EGM']
 val_method_list = ['PFI']
 print("Running continuous-time problems")
 CT = Y.solve_PFI()
@@ -62,7 +62,6 @@ CT = Y.solve_PFI()
 print("Running discrete-time problems")
 for pol_method in pol_method_list:
     #DT[(pol_method,'MPFI')] = X.solve_MPFI(pol_method,10,X.V0,prob=prob)
-    #DT[(pol_method,'MPFI')] = X.solve_MPFI(pol_method,10,CT[0],prob=prob)
     DT[(pol_method,'PFI')] = X.solve_PFI(pol_method,prob=prob)
 
 """
@@ -157,6 +156,24 @@ plt.savefig(destin, format='eps', dpi=1000)
 plt.show()
 plt.close()
 
+fig, ax = plt.subplots()
+V,c = DT[(pol_method,val_method)][0:2]
+for j in range(N[1]+1):
+    color = colorFader(c1,c2,j/(N[1]+1))
+    y = np.exp(X.grid[1][:])
+    d_assets = (1+X.dt*X.r)*(X.grid[0] + y[j] - c[:,j]) - X.grid[0]
+    if j in [0,N[1]]:
+        inc = X.ybar*np.round(np.exp(X.grid[1][j]),2)
+        ax.plot(X.grid[0], d_assets, color=color, label="Income {0}".format(inc), linewidth=1)
+    else:
+        ax.plot(X.grid[0], d_assets, color=color, linewidth=1)
+plt.xlabel('Assets $b$')
+plt.legend()
+plt.title('Difference in assets $\Delta b$ in stationary problem')
+destin = '../../main/figures/DT_stat_drift.eps'
+plt.savefig(destin, format='eps', dpi=1000)
+plt.show()
+
 """
 Comparison between discrete and continuous-time
 """
@@ -166,25 +183,9 @@ for j in range(N[1]+1):
     color = colorFader(c1,c2,j/(N[1]+1))
     if j in [0,N[1]]:
         inc = X.ybar*np.round(np.exp(X.grid[1][j]),2)
-        ax.plot(X.grid[0], DT[('EGM','PFI')][0][:,j] - CT[0][:,j], color=color, label="Income {0}".format(inc), linewidth=1)
+        ax.plot(X.grid[0], DT[('EGM','PFI')][1][:,j] - CT[1][:,j], color=color, label="Income {0}".format(inc), linewidth=1)
     else:
-        ax.plot(X.grid[0], DT[('EGM','PFI')][0][:,j] - CT[0][:,j], color=color, linewidth=1)
-plt.xlabel('Assets $b$')
-plt.legend()
-plt.title('Value function differences')
-destin = '../../main/figures/DT_CT_compare_V.eps'
-plt.savefig(destin, format='eps', dpi=1000)
-plt.show()
-plt.close()
-
-fig, ax = plt.subplots()
-for j in range(N[1]+1):
-    color = colorFader(c1,c2,j/(N[1]+1))
-    if j in [0,N[1]]:
-        inc = X.ybar*np.round(np.exp(X.grid[1][j]),2)
-        ax.plot(X.grid[0], dc[:,j], color=color, label="Income {0}".format(inc), linewidth=1)
-    else:
-        ax.plot(X.grid[0], dc[:,j], color=color, linewidth=1)
+        ax.plot(X.grid[0], DT[('EGM','PFI')][1][:,j] - CT[1][:,j], color=color, linewidth=1)
 plt.xlabel('Assets $b$')
 plt.legend()
 plt.title('Policy function differences')
