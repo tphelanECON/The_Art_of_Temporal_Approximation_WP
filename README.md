@@ -1,4 +1,5 @@
-# The_Art_of_Temporal_Approximation_WP
-Code for replication of working paper version of The Art of Temporal Approximation
+# The_Art_of_Temporal_Approximation
 
-This code is subject to change as the paper itself is a work-in-progress. Upon completion of peer review we will archive this repository. 
+Code for replication of "The Art of Temporal Approximation" by Keyvan Eslami and Thomas Phelan.
+
+If you have any questions please email the second author at tom.phelan@clev.frb.org. 
