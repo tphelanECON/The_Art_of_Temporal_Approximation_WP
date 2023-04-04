@@ -115,7 +115,7 @@ class DT_IFP(object):
             p_func[k] = P[ii,jj,k]
         return p_func
 
-    #Tauchen transition matrix:
+    #Tauchen transition matrix (only for appendix):
     def Tauchen(self):
         p = np.zeros((self.N[0]+1,self.N[1]+1,self.N[1]+1))
         #transition to interior z:
@@ -290,7 +290,7 @@ class DT_IFP(object):
         c = np.zeros((self.N[0]+1,self.N[1]+1,self.NA+1))
         time_array = np.zeros((2,self.NA+1))
         tic = time.time()
-        #Timing. Death occurs AT age NA. They consume at penultimate date.
+        #Timing. Death occurs AT age NA. They consume EVERYTHING at penultimate date.
         #NA+1 gridpoints so index=NA is death and NA-1 last point for consumption.
         c[:,:,self.NA-1] = self.ybar*np.exp(self.xx[1]) + self.xx[0]/self.dt
         V[:,:,self.NA-1] = self.MPFI(c[:,:,self.NA-1],np.zeros((self.N[0]+1,self.N[1]+1)),0,prob)
@@ -537,9 +537,11 @@ class CT_nonstat_IFP(object):
         P = P + self.P_func(row[int_kk],column[int_kk],self.p_func((ii,jj,kk),c)[key][int_kk])
         return P
 
-    #in the following, both sides of the system are divided through by dt.
+    #both sides of following divided by dt to reduce chance of overflow:
     def V(self,c):
-        b = c**(1-self.gamma)/(1-self.gamma)
+        b = np.zeros((self.N[0]+1,self.N[1]+1,self.N[2]+1))
+        b[self.kk<self.N[2]] = c[self.kk<self.N[2]]**(1-self.gamma)/(1-self.gamma)
+        b[self.kk==self.N[2]] = 0
         D = np.exp(-self.rho*self.Dt).reshape((self.M,))
         B = (sp.eye(self.M) - sp.diags(D)*self.P(c))/self.dt
         return sp.linalg.spsolve(B, b.reshape((self.M,))).reshape((self.N[0]+1,self.N[1]+1,self.N[2]+1))
@@ -561,7 +563,8 @@ class CT_nonstat_IFP(object):
         C = (IND==0)*self.c0 + (IND==1)*clow + (IND==2)*chigh
         C[0,:,:] = np.minimum(C[0,:,:], self.c0[0,:,:])
         C[-1,:,:] = np.maximum(C[-1,:,:], self.c0[-1,:,:])
-        return C
+        alive = self.kk<self.N[2]
+        return C*alive
 
     #"naive" PFI: literally PFI applied to situation with stochastic aging.
     def solve_PFI(self):
@@ -639,24 +642,27 @@ class CT_nonstat_IFP(object):
         C[-1,:] = np.maximum(C[-1,:], c0[-1,:])
         return C
 
+    #argument V_imp_up of following is value function for higher age:
     def solveVslice(self,V_imp_up,c_guess):
         V = self.V_imp(V_imp_up,c_guess)
         eps, i = 1, 1
-        while i < 20 and eps > self.tol:
+        while i < self.maxiter_PFI and eps > self.tol:
             V1 = self.V_imp(V_imp_up,self.polupdate_slice(V))
             eps = np.amax(np.abs(V - V1))
             V, i = V1, i+1
         return V
 
+    #want to adhere to same convention as in DT case: consumption and value
+    #function at last point vanish.
     def solve_seq_imp(self):
         if self.show_method==1:
             print("Starting sequential PFI")
         V = np.zeros((self.N[0]+1,self.N[1]+1,self.N[2]+1))
         c = np.zeros((self.N[0]+1,self.N[1]+1,self.N[2]+1))
         time_array = np.zeros((2,self.N[2]+1))
-        V_guess, c_guess = np.zeros((self.N[0]+1,self.N[1]+1)), self.c0[:,:,0]
-        V[:,:,self.N[2]-1] = self.solveVslice(V_guess, c_guess)
-        c[:,:,self.N[2]-1] = self.polupdate_slice(V[:,:,-1])
+        c_guess = self.c0[:,:,0]
+        V[:,:,self.N[2]-1] = self.solveVslice(V[:,:,self.N[2]], c_guess)
+        c[:,:,self.N[2]-1] = self.polupdate_slice(V[:,:,self.N[2]-1])
         tic = time.time()
         for k in range(self.N[2]-1):
             if (int(self.N[2]-1-k-1) % 10 == 0) & (self.show_iter == 1):

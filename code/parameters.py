@@ -1,23 +1,10 @@
 """
-Parameters common to all scripts. Column names for tables also appear here.
+Parameters common to all scripts.
 
-The choices for rho, r, gamma, nu, mubar and sigma and the bounds on the asset
-and income gridscome are from section F of the appendix to Achdou et al:
+Choices for rho, r, gamma, nu, mubar and sigma and bounds on asset and income
+grids are from section F of the appendix to Achdou et al:
 
     https://benjaminmoll.com/wp-content/uploads/2019/07/HACT_appendix.pdf
-
-I think we want cols_true and cols_compare to be in percentage terms.
-
-cols_true = ['$||c - c_{\textnormal{true}}||_1$',
-'$||c - c_{\textnormal{true}}||_{\infty}$',
-'$||c/c_{\textnormal{true}}-1||_1$',
-'$||c/c_{\textnormal{true}}-1||_{\infty}$']
-
-cols_compare = ['$||c_{DT} - c_{CT}||_1$',
-'$||c_{DT} - c_{CT}||_{\infty}$',
-'$||c_{DT}/c_{CT} - 1||_1$',
-'$||c_{DT}/c_{CT} - 1||_{\infty}$']
-
 
 """
 
@@ -34,13 +21,12 @@ max_age = 60
 NA = 60
 NA_scale = int(10)
 NA_true = int(NA_scale*NA)
-#Moll uses 2.33 for the following. We used 4 for the JEDC article but that seems
-#excessive given that the stationary distribution of log income is normally distributed.
-#we now use 3.
+#Achdou et al uses 2.33 for ind_sd. We used 4 for JEDC paper but that seems
+#excessive given that stat distribution of log income is normal.
 ind_sd = 3
 bnd = [[0, 50], [-ind_sd*nu, ind_sd*nu]]
 bnd_NS = [bnd[0], bnd[1], [0, max_age]]
-Nexample = (100,10)
+Nexample = (100,15)
 
 maxiter, maxiter_PFI, tol = 20000, 25, 10**-8
 show_method, show_iter, show_final = 0, 0, 0
@@ -51,11 +37,10 @@ Grid parameters ("true" values and grids for tables and scatterplot)
 
 N_c = 5000
 N_true_asset = 5000
-#income_set = [5,10,20]
 income_set = [5,15,25]
 N_true_set = [(N_true_asset, I) for I in income_set]
 
-N_sets = [[(25,I), (50,I), (100,I), (250,I), (1000,I)] for I in income_set]
+N_sets = [[(25,I), (50,I), (100,I), (250,I), (500,I)] for I in income_set]
 N_grid = np.linspace(np.log(50), np.log(500), 10)
 N_sets_scatter = [[(int(np.rint(np.exp(n))),I) for n in N_grid] for I in income_set]
 
@@ -77,8 +62,6 @@ c1,c2='lightsteelblue','darkblue'
 def colorFader(c1,c2,mix):
     return mpl.colors.to_hex((1-mix)*np.array(mpl.colors.to_rgb(c1)) + mix*np.array(mpl.colors.to_rgb(c2)))
 
-#I think we want this to be \Delta c and then \Delta c (\%)
-
 cols_true = ['$||\Delta c||_1$','$||\Delta c||_{\infty}$',
 '$||\Delta c (\%)||_1$','$||\Delta c (\%)||_{\infty}$']
 
@@ -88,7 +71,7 @@ cols_compare = ['$||\Delta c||_1$','$||\Delta c||_{\infty}$',
 relax_list = relax_list
 cols_time = ['VFI']
 for relax in relax_list:
-    cols_time.append(r'MPFI ({0})'.format(relax))
+    cols_time.append(r'MPFI({0})'.format(relax))
 cols_time.append('PFI')
 
 cols_time_nonstat = ['EGM','Seq. PFI','Naive PFI']
