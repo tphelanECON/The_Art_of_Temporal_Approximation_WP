@@ -237,7 +237,9 @@ def time_tables(N_set,DT_dt,CT_dt,runs,prob='KD'):
 """
 Use EGM for accuracy in following (that is what is used in time tables).
 
-No need for max over relaxations in following because MPFI not used in nonstat setting.
+No max over relaxations in following because MPFI not used in nonstat setting.
+
+Also run_PFI=False because naive PFI is never a good idea.
 """
 def time_accuracy_data(true_val,N_set,DT_dt,CT_dt,runs,prob='KD',norm='mean'):
     DT, CT = {}, {}
@@ -272,7 +274,7 @@ def time_accuracy_figures(true_val,N_set,DT_dt,CT_dt,runs,prob='KD',norm='mean')
     if norm=='mean':
         ax.set_title('$l_1$ norm' + ' ({0} income points)'.format(N_I))
     else:
-        ax.set_title('$l_{\infty}$ norm' + '({0} income points)'.format(N_I))
+        ax.set_title('$l_{\infty}$ norm' + ' ({0} income points)'.format(N_I))
     destin = '../../main/figures/time_accuracy_nonstat_{0}_{1}_{2}_{3}_{4}.eps'.format(int(10**3*DT_dt),int(10**6*CT_dt),prob,norm,N_I)
     plt.savefig(destin, format='eps', dpi=1000)
     #plt.show()
@@ -282,14 +284,14 @@ def time_accuracy_figures(true_val,N_set,DT_dt,CT_dt,runs,prob='KD',norm='mean')
 Create tables. Unlike stationary case, no need to loop over different income.
 """
 i=1
-N = parameters.N_true_set[1]
-N_set = parameters.N_sets[1]
-N_scatter = parameters.N_sets_scatter[1]
+N = parameters.N_true_set[i]
+N_set = parameters.N_sets[i]
+N_scatter = parameters.N_sets_scatter[i]
 """
 Accuracy
 """
 true_val = true_nonstat_load(parameters.DT_dt, parameters.CT_dt_true, parameters.NA, 'KD', N)
-accuracy_tables(true_val, parameters.N_sets[1], parameters.DT_dt, parameters.CT_dt_true, 'both', 'EGM', 'KD')
+accuracy_tables(true_val, parameters.N_sets[i], parameters.DT_dt, parameters.CT_dt_true, 'both', 'EGM', 'KD')
 """
 Time for convergence
 """

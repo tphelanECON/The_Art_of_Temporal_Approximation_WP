@@ -1,8 +1,7 @@
 """
 Create figures for non-stationary problem without medical expenditures.
 
-The only quantity depicted here is the change in assets in the initial period,
-which looks similar to the value that obtains in the stationary setting.
+Only quantity depicted here is change in assets in initial period.
 """
 
 import os, sys, inspect
@@ -45,6 +44,15 @@ DT['VFI_EGM'] = X.nonstat_solve('EGM')
 V_DT, c_DT = DT['VFI_EGM'][0:2]
 CT['seq_PFI'] = Z.solve_seq_imp()
 V_imp, c_imp = CT['seq_PFI'][0:2]
+
+"""
+Following is to remind myself that it can make a big difference in run times
+if we avoid constructing a sparse matrix when solving the problem:
+
+    DT['matrix'] = X.nonstat_solve('EGM',matrix=True)
+    DT['no_matrix'] = X.nonstat_solve('EGM',matrix=False)
+
+"""
 
 dc_p = 100*np.abs((c_imp-c_DT)/c_DT)
 
