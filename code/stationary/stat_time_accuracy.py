@@ -59,8 +59,7 @@ cols_compare = parameters.cols_compare
 cols_time = parameters.cols_time
 
 """
-Compare with true values (accuracy_data no longer contains the comparisons across methods).
-Want to rewrite following in percentage deviations of policy function.
+Compare with true values. Accuracy notion: percentage deviations of policy function.
 """
 
 def accuracy_data(true_val,N_set,DT_dt,CT_dt,framework='both',method='EGM',prob='KD'):
@@ -116,8 +115,7 @@ def accuracy_data(true_val,N_set,DT_dt,CT_dt,framework='both',method='EGM',prob=
     elif framework=='CT':
         return pd.DataFrame(data=data_CT,index=N_set,columns=cols_true)
     else:
-        return pd.DataFrame(data=data_DT,index=N_set,columns=cols_true), \
-        pd.DataFrame(data=data_CT,index=N_set,columns=cols_true)
+        return pd.DataFrame(data=data_DT,index=N_set,columns=cols_true), pd.DataFrame(data=data_CT,index=N_set,columns=cols_true)
 
 def comparison_data(N_set,DT_dt,CT_dt,method='EGM',prob='KD'):
     X, Y, DT, CT = {}, {}, {}, {}
@@ -203,7 +201,7 @@ def time_data(N_set,DT_dt,CT_dt,runs,framework='DT',prob='KD',run_MPFI=True):
                 else:
                     d['VFI'], d_iter['VFI'] = np.inf, 0
                 for relax in relax_list:
-                    s = r'MPFI ({0})'.format(relax)
+                    s = r'MPFI({0})'.format(relax)
                     d[s], d_iter[s] = X[N].solve_MPFI('EGM',relax,X[N].V0,prob)[2:]
                 time_data.append(d)
                 iter_data.append(d_iter)
@@ -212,12 +210,12 @@ def time_data(N_set,DT_dt,CT_dt,runs,framework='DT',prob='KD',run_MPFI=True):
                 if run_MPFI==True:
                     d['VFI'], d_iter['VFI'] = Y[N].solve_MPFI(0)[2:]
                     for relax in relax_list:
-                        s = r'MPFI ({0})'.format(relax)
+                        s = r'MPFI({0})'.format(relax)
                         d[s], d_iter[s] = Y[N].solve_MPFI(relax)[2:]
                 else:
                     d['VFI'], d_iter['VFI'] = np.inf, 0
                     for relax in relax_list:
-                        s = r'MPFI ({0})'.format(relax)
+                        s = r'MPFI({0})'.format(relax)
                         d[s], d_iter[s] = np.inf, 0
                 time_data.append(d)
                 iter_data.append(d_iter)
@@ -285,9 +283,9 @@ def time_accuracy_figures(true_val,N_set,DT_dt,CT_dt,runs,prob='KD',norm='mean')
     plt.xlabel("Percent deviation from true policy function")
     plt.legend()
     if norm=='mean':
-        ax.set_title('$l_1$ norm' + ' ({0} income points)'.format(N_true_shape[1]-1))
+        ax.set_title('$l_1$ norm' + ' ({0} income points)'.format(N_I))
     else:
-        ax.set_title('$l_{\infty}$ norm' + '({0} income points)'.format(N_true_shape[1]-1))
+        ax.set_title('$l_{\infty}$ norm' + ' ({0} income points)'.format(N_I))
     destin = '../../main/figures/time_accuracy_{0}_{1}_{2}_{3}_{4}.eps'.format(int(10**3*DT_dt), int(10**6*CT_dt), prob, norm, N_I)
     plt.savefig(destin, format='eps', dpi=1000)
     #plt.show()
@@ -298,19 +296,21 @@ Create tables and scatterplots
 """
 
 runs = 10
-run_time_tables = 0
+run_time_tables = 1
 
 for i in range(len(parameters.income_set)):
+    """
+    Continuous-time and EGM accuracy
+    """
     true_val = true_stat_load(parameters.DT_dt, parameters.CT_dt_true, 'KD', parameters.N_true_set[i])
     accuracy_tables(true_val, parameters.N_sets[i], parameters.DT_dt, parameters.CT_dt_true, 'both','EGM', 'KD')
     """
-    Also brute force
+    Brute force
     """
     accuracy_tables(true_val, parameters.N_sets[i], parameters.DT_dt, parameters.CT_dt_true, 'DT','BF', 'KD')
     accuracy_tables(true_val, parameters.N_sets[i], parameters.DT_dt, parameters.CT_dt_true, 'DT','BF', 'Tauchen')
     """
-    Sensitivity of continuous-time methods to timestep. Only used in the appendix
-    as the results do not appear to be particularly surprising.
+    Sensitivity of CT methods to timestep. Only used in appendix.
     """
     accuracy_tables(true_val, parameters.N_sets[i], parameters.DT_dt, parameters.CT_dt_mid, 'CT', 'EGM', 'KD')
     accuracy_tables(true_val, parameters.N_sets[i], parameters.DT_dt, parameters.CT_dt_big, 'CT', 'EGM', 'KD')
@@ -324,8 +324,10 @@ for i in range(len(parameters.income_set)):
     """
     true_val = true_stat_load(parameters.DT_dt, parameters.CT_dt_true, 'Tauchen', parameters.N_true_set[i])
     accuracy_tables(true_val, parameters.N_sets[i], parameters.DT_dt, parameters.CT_dt_true, 'DT', 'EGM', 'Tauchen')
+
+for i in range(len(parameters.income_set)):
     """
-    Run times versus grid sizes. Only time we use the "big" CT timestep.
+    Run times versus grid sizes. Only time we use "big" CT timestep.
     """
     if run_time_tables==1:
         time_tables( parameters.N_sets[i], parameters.DT_dt, parameters.CT_dt_big, runs, 'DT', 'KD')

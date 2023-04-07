@@ -193,3 +193,22 @@ destin = '../../main/figures/DT_CT_compare_c.eps'
 plt.savefig(destin, format='eps', dpi=1000)
 plt.show()
 plt.close()
+
+"""
+Now test the timestep
+"""
+
+Z = {}
+CT_test = {}
+#dt_tests = [0.29,0.3,0.31,0.32,0.33]
+dt_tests = [0.05, 0.075, 0.09]
+N_test = parameters.N_sets[1][-1]
+for i in range(len(dt_tests)):
+    Z[i] = classes.CT_stat_IFP(rho=rho,r=r,gamma=gamma,ybar=ybar,mubar=mubar,sigma=sigma,
+    N=N_test,bnd=bnd,maxiter=maxiter,tol=tol,show_method=show_method,show_iter=show_iter,
+    show_final=show_final,dt=dt_tests[i])
+    print("Running continuous-time problem for dt = {0}".format(dt_tests[i]))
+    CT_test[i] = Z[i].solve_PFI()
+
+for i in range(len(dt_tests)):
+    print(np.mean(np.abs(CT_test[i][1]-CT_test[0][1])))
