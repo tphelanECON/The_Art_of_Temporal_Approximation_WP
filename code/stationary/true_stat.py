@@ -84,8 +84,7 @@ def true_CT_stat(CT_dt,N_true):
 """
 Build true DT and CT quantities if they do not exist
 """
-for i in range(1,3):
-#for i in range(len(parameters.income_set)):
+for i in range(len(parameters.income_set)):
     true_CT_stat(parameters.CT_dt_true,parameters.N_true_set[i])
     true_DT_stat(parameters.DT_dt,'KD',parameters.N_true_set[i])
     true_DT_stat(parameters.DT_dt,'Tauchen',parameters.N_true_set[i])
