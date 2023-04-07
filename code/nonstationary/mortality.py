@@ -264,10 +264,8 @@ mubar, sigma = parameters.mubar, parameters.sigma
 tol, maxiter, maxiter_PFI = parameters.tol, parameters.maxiter, parameters.maxiter_PFI
 bnd, bnd_NS = parameters.bnd, parameters.bnd_NS
 
-N_true = parameters.N_true
 show_iter, show_method, show_final = 1, 1, 1
 NA = parameters.NA
-NA_true = parameters.NA_true
 N_t = parameters.N_t
 N_c = parameters.N_c
 n_round_acc = parameters.n_round_acc
@@ -362,13 +360,13 @@ for k in k_set:
             ax.plot(W.grid[0][1:], 100*W.lam_func(pol[1][1:,j,k],k,form), color=color, label="Income {0}".format(inc), linewidth=1)
         else:
             ax.plot(W.grid[0][1:], 100*W.lam_func(pol[1][1:,j,k],k,form), color=color, linewidth=1)
-    #plt.xlim([0,50])
     plt.xlabel('Assets $b$')
     plt.legend()
     plt.title('Percent chance of death at age {0}'.format(int(W.grid[2][k]*W.Delta[2])+20))
     destin = '../../main/figures/mortality_death_{0}.eps'.format(int(W.grid[2][k]*W.Delta[2]))
     plt.savefig(destin, format='eps', dpi=1000)
-    plt.show()
+    #plt.show()
+    plt.close()
 
     fig, ax = plt.subplots()
     for j in range(N[1]+1):
@@ -378,10 +376,10 @@ for k in k_set:
             ax.plot(W.grid[0][1:], pol[2][1:,j,k], color=color, label="Income {0}".format(inc), linewidth=1)
         else:
             ax.plot(W.grid[0][1:], pol[2][1:,j,k], color=color, linewidth=1)
-    #plt.xlim([0,50])
     plt.xlabel('Assets $b$')
     plt.legend()
     plt.title('Labor at age {0}'.format(int(W.grid[2][k]*W.Delta[2])+20))
     destin = '../../main/figures/mortality_l_{0}.eps'.format(int(W.grid[2][k]*W.Delta[2]))
     plt.savefig(destin, format='eps', dpi=1000)
-    plt.show()
+    #plt.show()
+    plt.close()
