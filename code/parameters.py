@@ -47,8 +47,8 @@ N_sets_scatter = [[(int(np.rint(np.exp(n))),I) for n in N_grid] for I in income_
 relax_list = [10, 50, 100, 200]
 DT_dt = 10**0
 CT_dt_true = 10**-6
-CT_dt_mid = 10**-3
-CT_dt_big = 2*10**-2
+CT_dt_mid = 5*10**-3
+CT_dt_big = 5*10**-2
 N_t = int(1/CT_dt_true)
 
 """

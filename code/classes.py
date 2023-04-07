@@ -83,12 +83,10 @@ class DT_IFP(object):
         self.p_z['KD'] = self.KD()
         self.p_z['Tauchen'] = self.Tauchen()
         self.check = np.min(self.p_z['KD']) > -10**-8
-        #compute following transitions to avoid repeatedly building z matrix:
+        #compute following ONCE to avoid repeatedly building z matrix:
         for disc in ['KD','Tauchen']:
             self.probs[disc] = self.p_func((self.ii, self.jj), prob=disc)
         #upper and lower bounds on consumption:
-        #only need to impose state constraints at boundary for CT. Not the case here
-        #though as the state can move "non-locally".
         self.clow = (self.grid[0][self.ii] - self.grid[0][-1]/(1+self.dt*self.r))/self.dt + self.ybar*np.exp(self.grid[1][self.jj]) + 10**-4
         self.chigh = (self.grid[0][self.ii] - self.grid[0][0]/(1+self.dt*self.r))/self.dt + self.ybar*np.exp(self.grid[1][self.jj]) - 10**-4
         #following is initial guess:
@@ -283,7 +281,7 @@ class DT_IFP(object):
             print("Time taken:", toc-tic)
         return V, c, toc-tic, i
 
-    def nonstat_solve(self,method,prob='KD',matrix=True):
+    def nonstat_solve(self,method,prob='KD',matrix=False):
         if self.show_method==1:
             print("Starting non-stationary problem with {0} policy updates and {1} probabilities".format(method,prob))
         V = np.zeros((self.N[0]+1,self.N[1]+1,self.NA+1))
