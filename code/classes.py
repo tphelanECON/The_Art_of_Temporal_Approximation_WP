@@ -24,15 +24,15 @@ Some miscellaneous notes:
     be restricted so that future assets lie on exogenous grid.
     * To address potential overflow problems when using sparse solver, we divide
     both sides of the system by Dt to be commensurate with flow utility.
-    * Boundary points of bnd are excluded. e.g. if bnd[0] = [0, 60] and N[0] = 100,
-    the grid for assets has 99 points between Delta_a and 60 - Delta_a inclusive.
+    * Boundary points of bnd are included. e.g. if bnd[0] = [0, 60] and N[0] = 100,
+    the grid for assets has 101 points between 0 and 60 inclusive.
     * One needs sufficient dissaving at the top of asset grid.
     * In the DT_IFP and CT_IFP cases there is no need for an arbitrary ind
     argument, because these only ever take ii,jj = self.ii, self.jj. However, this
     generality is necessary in the nonstationary problem, where "slices" arise.
     * The DT_IFP class constructor allows for both the same probability
     transitions in the continuous-time case, denoted prob='KD' for "Kushner and
-    Dupuis", and also the method of Tauchen (1986), denoted prob='Tauchen'.
+    Dupuis" construction, and the method of Tauchen (1986), denoted prob='Tauchen'.
     * All class constructors write self.cmax = self.kappac*self.c0, a vector
     that is a multiple of zero net saving. This default is 2 for the stationary
     problem, which never binds at the optimum.
@@ -41,8 +41,8 @@ Some miscellaneous notes:
 Discussion of boundaries:
     * In CT, V vanishes at Abar. We only compute values at Abar - DeltaA, Abar - 2*DeltaA, etc.
     * This is also true in the DT case (see nonstat_solve).
-
-I discovered that the biggest time sink is in the interpolation in the brute force case.
+    * When assessing percentage change in policy function, we therefore omit the
+    final period, because otherwise we get 0/0.
 """
 
 import numpy as np
