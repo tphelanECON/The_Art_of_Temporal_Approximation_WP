@@ -14,7 +14,7 @@ Some problems that can arise for certain parameters:
     the upper bound. Otherwise we get a "spike" in consumption.
     * be careful to not have nonzero outer transitions on the boundary.
     * once we include b=0, if agent doesn't work at lower bound self.u will
-    generate nans. They will wish to work at this point though.
+    generate nans (the agent will never select this though).
 
 Mortality rates obtained from https://www.ssa.gov/oact/STATS/table4c6.html
 """
@@ -289,7 +289,7 @@ N = parameters.Nexample
 k_set=[0,35,55]
 D=-80
 Lam0low = 0.001
-Lam0high = 0.05
+Lam0high = 0.06
 Lam1low = 3.0
 Lam1high = 0.0
 etalow = 0.9
