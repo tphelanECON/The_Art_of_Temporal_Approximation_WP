@@ -1,5 +1,6 @@
 """
-Class constructors for "The Art of Temporal Approximation".
+Class constructors for stationary and non-stationary IFPs appearing in the
+paper "The Art of Temporal Approximation".
 
 Author: Thomas Phelan.
 Email: tom.phelan@clev.frb.org.
@@ -36,7 +37,6 @@ Some miscellaneous notes:
     * All class constructors write self.cmax = self.kappac*self.c0, a vector
     that is a multiple of zero net saving. This default is 2 for the stationary
     problem, which never binds at the optimum.
-    * N+1 points in each dimension inclusive of bnd. Ensures Delta = (bnd[1]-bnd[0])/N.
 
 Discussion of boundaries:
     * In CT, V vanishes at Abar. We only compute values at Abar - DeltaA, Abar - 2*DeltaA, etc.
@@ -77,6 +77,7 @@ class DT_IFP(object):
         self.dt_small = self.dt/self.N_t
         self.kappac = kappac
         self.cmax = self.kappac*self.c0
+        #following dummies determine whether python prints progress of convergence
         self.show_method, self.show_iter, self.show_final = show_method, show_iter, show_final
         self.iter_keys = list(itertools.product(range(self.N[0]+1), range(self.N[1]+1)))
         self.probs, self.p_z = {}, {}
@@ -86,7 +87,7 @@ class DT_IFP(object):
         #compute following ONCE to avoid repeatedly building z matrix:
         for disc in ['KD','Tauchen']:
             self.probs[disc] = self.p_func((self.ii, self.jj), prob=disc)
-        #upper and lower bounds on consumption:
+        #upper and lower bounds on consumption (ad-hoc, but non-binding):
         self.clow = (self.grid[0][self.ii] - self.grid[0][-1]/(1+self.dt*self.r))/self.dt + self.ybar*np.exp(self.grid[1][self.jj]) + 10**-4
         self.chigh = (self.grid[0][self.ii] - self.grid[0][0]/(1+self.dt*self.r))/self.dt + self.ybar*np.exp(self.grid[1][self.jj]) - 10**-4
         #following is initial guess:
@@ -113,7 +114,7 @@ class DT_IFP(object):
             p_func[k] = P[ii,jj,k]
         return p_func
 
-    #Tauchen transition matrix (only for appendix):
+    #Tauchen transition matrix for income transitions (only for appendix):
     def Tauchen(self):
         p = np.zeros((self.N[0]+1,self.N[1]+1,self.N[1]+1))
         #transition to interior z:
@@ -131,7 +132,7 @@ class DT_IFP(object):
         p[iii,jjj,kkk] = 1 - norm.cdf(down_bnd)
         return p
 
-    #(N_1 - 1) x (N_1 - 1) matrix of income transitions.
+    #(N_1 + 1) x (N_1 + 1) matrix of income transitions used in main text.
     #make a KD matrix for small timestep and then iterate on transpose.
     def KD_z(self):
         p_z_small = np.zeros((self.N[1]+1,self.N[1]+1))
@@ -164,6 +165,7 @@ class DT_IFP(object):
         alpha, ind = self.weights_indices(b_prime)
         ii, jj = self.ii, self.jj
         for key in range(self.N[1]+1):
+            #transitions from (i,j) point located at i*(self.N[1]+1) + j row
             #lower then upper weights on asset transition:
             row, col = ii*(self.N[1]+1) + jj, ind[ii,jj]*(self.N[1]+1) + key
             P = P + self.P_func(row,col,alpha[ii,jj]*self.probs[prob][key])
@@ -171,8 +173,8 @@ class DT_IFP(object):
         return P
 
     #stat indicates stationary or nonstationary, which affects consumption bounds.
-    #somewhat ad-hoc: set upper bound 10 x higher in nonstatioary case.
-    #method=='BF' for brute force or EGM:
+    #Set upper bound 10 x higher in nonstatioary case. Somewhat ad-hoc but does
+    #not bind. method=='BF' (brute force) or 'EGM'.
     def polupdate(self,method,V,prob,stat=1):
         cnew = np.zeros((self.N[0]+1,self.N[1]+1))
         if method=='BF':
@@ -344,6 +346,7 @@ class DT_IFP(object):
             return V, c, toc0-tic0, i
 
     #following used in the contruction of transition matrix P.
+    #values contained in C, co-ordinates contained in (A, B).
     def P_func(self,A,B,C):
         A,B,C = np.array(A), np.array(B), np.array(C)
         A,B,C = A[(B>-1)*(B<self.M)],B[(B>-1)*(B<self.M)],C[(B>-1)*(B<self.M)]
@@ -650,8 +653,7 @@ class CT_nonstat_IFP(object):
             V, i = V1, i+1
         return V
 
-    #want to adhere to same convention as in DT case: consumption and value
-    #function at last point vanish.
+    #adhere to same convention as in DT case: c and V vanish at last point. 
     def solve_seq_imp(self):
         if self.show_method==1:
             print("Starting sequential PFI")

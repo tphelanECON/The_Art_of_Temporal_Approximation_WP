@@ -1,8 +1,8 @@
 """
 Parameters common to all scripts.
 
-Choices for rho, r, gamma, nu, mubar and sigma and bounds on asset and income
-grids are from section F of the appendix to Achdou et al:
+Choices for rho, r, gamma, nu, mubar and sigma and bounds on the asset grids
+are from section F of the appendix to Achdou et al:
 
     https://benjaminmoll.com/wp-content/uploads/2019/07/HACT_appendix.pdf
 
