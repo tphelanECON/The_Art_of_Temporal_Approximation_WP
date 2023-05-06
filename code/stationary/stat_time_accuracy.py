@@ -22,6 +22,9 @@ Methods:
     for time taken to solve problems on various grids.
     * time_accuracy_data(true_val,N_set,DT_dt,CT_dt,runs,prob,norm): data for time_accuracy_figures.
     * time_accuracy_figures(true_val,N_set,DT_dt,CT_dt,runs,prob) creates scatterplots.
+
+May 2023: might need to add plt.tight_layout() to ensure readability of figures.
+See: https://stackoverflow.com/questions/6774086/how-to-adjust-padding-with-cutoff-or-overlapping-labels
 """
 
 import os, sys, inspect
@@ -282,6 +285,8 @@ def time_accuracy_figures(true_val,N_set,DT_dt,CT_dt,runs,prob='KD',norm='mean')
     plt.ylabel("Time to convergence (seconds)")
     plt.xlabel("Percent deviation from true policy function")
     plt.legend()
+    #following helps ensure that y-labels are not cut off. 
+    plt.tight_layout()
     if norm=='mean':
         ax.set_title('$l_1$ norm' + ' ({0} income points)'.format(N_I))
     else:

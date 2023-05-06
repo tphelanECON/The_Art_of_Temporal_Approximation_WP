@@ -195,12 +195,14 @@ plt.show()
 plt.close()
 
 """
-Now test the timestep
+The following will return an error and so I have commented it out.
+
+It justifies the claim that the code fails to converge for dt approx 0.09.
 """
 
+"""
 Z = {}
 CT_test = {}
-#dt_tests = [0.29,0.3,0.31,0.32,0.33]
 dt_tests = [0.05, 0.075, 0.09]
 N_test = parameters.N_sets[1][-1]
 for i in range(len(dt_tests)):
@@ -212,3 +214,4 @@ for i in range(len(dt_tests)):
 
 for i in range(len(dt_tests)):
     print(np.mean(np.abs(CT_test[i][1]-CT_test[0][1])))
+"""
