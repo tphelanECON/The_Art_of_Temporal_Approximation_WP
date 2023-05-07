@@ -254,7 +254,7 @@ class DT_IFP(object):
         #iterate over log income shocks
         for key in range(self.N[1]+1):
             #lower then upper weights on asset transition:
-            row, col = ii*(self.N[1]+1) + jj, ind[ii,jj]*(self.N[1]+1) + jj + key
+            row, col = ii*(self.N[1]+1) + jj, ind[ii,jj]*(self.N[1]+1) + key
             ind_bnd = (col>-1)*(col<self.M)
             ii_, jj_ = ii[ind_bnd], jj[ind_bnd]
             ind_ = ind[ii_,jj_]
@@ -653,7 +653,7 @@ class CT_nonstat_IFP(object):
             V, i = V1, i+1
         return V
 
-    #adhere to same convention as in DT case: c and V vanish at last point. 
+    #adhere to same convention as in DT case: c and V vanish at last point.
     def solve_seq_imp(self):
         if self.show_method==1:
             print("Starting sequential PFI")
