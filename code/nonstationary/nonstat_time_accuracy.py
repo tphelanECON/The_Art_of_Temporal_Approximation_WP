@@ -297,6 +297,7 @@ Time for convergence
 """
 runs=10
 for prob in ['KD']:
+    time_tables(parameters.N_sets[0], parameters.DT_dt, parameters.CT_dt_true, runs, prob)
     time_tables(parameters.N_sets[i], parameters.DT_dt, parameters.CT_dt_true, runs, prob)
 """
 Speed versus accuracy
